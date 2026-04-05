@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Dependencies for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "yourusername"
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    versioning-strategy: increase
+    ignore:
+      # Ignore major version updates for packages below
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]

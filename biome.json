@@ -1,0 +1,123 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "ignore": ["dist/**", "node_modules/**", "coverage/**", "*.config.js", "*.config.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100,
+    "attributePosition": "auto"
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "a11y": {
+        "recommended": true
+      },
+      "complexity": {
+        "recommended": true,
+        "noForEach": "off",
+        "useLiteralKeys": "off"
+      },
+      "correctness": {
+        "recommended": true,
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "warn",
+        "useHookAtTopLevel": "warn"
+      },
+      "performance": {
+        "recommended": true
+      },
+      "security": {
+        "recommended": true,
+        "noDangerouslySetInnerHtmlWithChildren": "off"
+      },
+      "style": {
+        "recommended": true,
+        "noNonNullAssertion": "off",
+        "useConst": "error",
+        "useExportType": "error",
+        "useImportType": "error",
+        "noParameterAssign": "warn"
+      },
+      "suspicious": {
+        "recommended": true,
+        "noConsoleLog": "warn",
+        "noArrayIndexKey": "warn",
+        "noExplicitAny": "error",
+        "noExtraNonNullAssertion": "error"
+      },
+      "nursery": {
+        "useSortedClasses": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
+  "json": {
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineEnding": "lf",
+      "lineWidth": 100,
+      "trailingCommas": "none"
+    }
+  },
+  "overrides": [
+    {
+      "include": ["**/*.ts", "**/*.tsx"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "error"
+          },
+          "style": {
+            "noParameterAssign": "warn"
+          },
+          "suspicious": {
+            "noExplicitAny": "error"
+          }
+        }
+      }
+    },
+    {
+      "include": ["examples/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsoleLog": "off"
+          }
+        }
+      }
+    }
+  ]
+}
