@@ -1,0 +1,601 @@
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { SectionHeader } from '@/components/ui/section-header';
+import { Textarea } from '@/components/ui/textarea';
+import { fetchJson } from '@/lib/api';
+import type { CliStatus, CliToolStatus, CliToolsResponse } from '@/types/tool';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Bot,
+  CheckCircle2,
+  Code2,
+  Github,
+  RefreshCw,
+  Save,
+  Server,
+  XCircle,
+  Zap,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SettingsSection {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function FieldGroup({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
+}
+
+function Field({
+  id,
+  label,
+  hint,
+  children,
+  fullWidth = false,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={`space-y-1.5 ${fullWidth ? 'sm:col-span-2' : ''}`}>
+      <Label htmlFor={id} className="font-mono text-foreground text-xs uppercase tracking-widest">
+        {label}
+      </Label>
+      {children}
+      {hint && <p className="font-code text-muted-foreground text-xs">{hint}</p>}
+    </div>
+  );
+}
+
+function SectionCard({
+  section,
+  active,
+  dimmed,
+  children,
+}: {
+  section: SettingsSection;
+  active: boolean;
+  dimmed?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      id={section.id}
+      className="border border-border bg-card"
+      style={
+        active
+          ? {
+              borderColor: 'rgba(55,247,18,0.35)',
+              boxShadow: 'inset 0 0 16px rgba(55,247,18,0.04)',
+            }
+          : dimmed
+            ? { opacity: 0.55 }
+            : undefined
+      }
+    >
+      <div className="flex items-center gap-3 border-border border-b px-4 py-3.5 sm:px-5">
+        <span
+          className={dimmed ? 'text-muted-foreground' : 'text-primary'}
+          style={dimmed ? undefined : { filter: 'drop-shadow(0 0 4px rgba(55,247,18,0.5))' }}
+        >
+          {section.icon}
+        </span>
+        <div className="min-w-0">
+          <p className="font-bold font-mono text-foreground text-xs">{section.label}</p>
+          <p className="truncate font-code text-2xs text-muted-foreground">{section.description}</p>
+        </div>
+      </div>
+      <div className="space-y-4 px-4 py-4 sm:px-5">{children}</div>
+    </div>
+  );
+}
+
+// ─── CLI status badge ──────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: CliStatus }) {
+  if (status === 'configured') {
+    return (
+      <span className="flex items-center gap-1.5">
+        <CheckCircle2
+          className="h-3.5 w-3.5 text-primary"
+          style={{ filter: 'drop-shadow(0 0 4px rgba(55,247,18,0.7))' }}
+        />
+        <span
+          className="font-mono text-primary text-xs"
+          style={{ textShadow: 'var(--glow-primary)' }}
+        >
+          configured
+        </span>
+      </span>
+    );
+  }
+  if (status === 'installed') {
+    return (
+      <span className="flex items-center gap-1.5">
+        <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+        <span className="font-mono text-xs text-yellow-500">not_configured</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      <XCircle className="h-3.5 w-3.5 text-destructive" />
+      <span className="font-mono text-destructive text-xs">not_installed</span>
+    </span>
+  );
+}
+
+// ─── CLI Tool Status Card ─────────────────────────────────────────────────────
+
+const CLI_INSTALL_HINTS: Record<string, string> = {
+  claude_code: 'npm install -g @anthropic-ai/claude-code',
+  codex: 'npm install -g @openai/codex',
+  gemini_cli: 'npm install -g @google/gemini-cli',
+  opencode: 'npm install -g opencode',
+};
+
+const CLI_AUTH_HINTS: Record<string, string> = {
+  claude_code: 'claude login',
+  codex: 'codex login',
+  gemini_cli: 'export GEMINI_API_KEY=...  # or GOOGLE_API_KEY=...',
+  opencode: 'opencode login',
+};
+
+function CliStatusCard({ tool }: { tool: CliToolStatus }) {
+  return (
+    <div className="space-y-3">
+      {/* Status + version row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusBadge status={tool.status} />
+        {tool.version && (
+          <span className="border border-border px-1.5 py-0.5 font-code text-2xs text-muted-foreground">
+            v{tool.version}
+          </span>
+        )}
+        <span className="ml-auto font-code text-2xs text-muted-foreground/50">
+          $ {tool.command} --version
+        </span>
+      </div>
+
+      {/* Not installed hint */}
+      {tool.status === 'not_installed' && (
+        <div className="space-y-1 border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+          <p className="font-code text-destructive text-xs">{'> command not found in PATH'}</p>
+          {CLI_INSTALL_HINTS[tool.id] && (
+            <p className="font-code text-2xs text-muted-foreground">
+              {'$ '}
+              <span className="text-muted-foreground/80">{CLI_INSTALL_HINTS[tool.id]}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Installed but not configured hint */}
+      {tool.status === 'installed' && (
+        <div className="space-y-1 border border-yellow-500/30 bg-yellow-500/5 px-3 py-2.5">
+          <p className="font-code text-xs text-yellow-500">
+            {'> installed but authentication required'}
+          </p>
+          {CLI_AUTH_HINTS[tool.id] && (
+            <p className="font-code text-2xs text-muted-foreground">
+              {'$ '}
+              <span className="text-muted-foreground/80">{CLI_AUTH_HINTS[tool.id]}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Models — only when configured */}
+      {tool.status === 'configured' && (
+        <div className="space-y-2">
+          <p className="font-mono text-2xs text-muted-foreground uppercase tracking-widest">
+            models ({tool.models.length})
+          </p>
+          {tool.models.length === 0 ? (
+            <p className="font-code text-2xs text-muted-foreground/60">
+              {'> no models returned by CLI'}
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {tool.models.map((name) => (
+                <span
+                  key={name}
+                  className="border border-border px-1.5 py-0.5 font-code text-2xs text-muted-foreground"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CLI Tools Section ────────────────────────────────────────────────────────
+
+const CLI_SECTIONS: Array<{
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+  toolId: string;
+}> = [
+  {
+    id: 'claude',
+    label: 'claude_code',
+    icon: <Bot className="h-4 w-4" />,
+    description: 'Anthropic CLI — claude',
+    toolId: 'claude_code',
+  },
+  {
+    id: 'codex',
+    label: 'codex',
+    icon: <Code2 className="h-4 w-4" />,
+    description: 'OpenAI CLI — codex',
+    toolId: 'codex',
+  },
+  {
+    id: 'gemini',
+    label: 'gemini_cli',
+    icon: <Bot className="h-4 w-4" />,
+    description: 'Google CLI — gemini',
+    toolId: 'gemini_cli',
+  },
+  {
+    id: 'opencode',
+    label: 'open_code',
+    icon: <Zap className="h-4 w-4" />,
+    description: 'OpenCode CLI — opencode',
+    toolId: 'opencode',
+  },
+];
+
+function CliToolsSection() {
+  const [tools, setTools] = useState<CliToolStatus[]>([]);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadTools = useCallback(async (recheck = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const typed = await fetchJson<CliToolsResponse>(recheck ? '/tools/recheck' : '/tools', {
+        method: recheck ? 'POST' : 'GET',
+      });
+      setTools(typed.items);
+      setCachedAt(typed.cachedAt);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load CLI status');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTools();
+  }, [loadTools]);
+
+  const cachedAtLabel = cachedAt
+    ? new Date(cachedAt).toLocaleString(undefined, {
+        dateStyle: 'short',
+        timeStyle: 'medium',
+      })
+    : null;
+
+  return (
+    <>
+      {/* Recheck bar */}
+      <div className="flex items-center justify-between border border-border bg-card px-4 py-3 sm:px-5">
+        <p className="font-code text-2xs text-muted-foreground">
+          {cachedAtLabel ? `> last refresh: ${cachedAtLabel}` : '> cli tools detected from PATH'}
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => loadTools(true)}
+          disabled={loading}
+          className="font-mono text-xs"
+        >
+          <RefreshCw className={`mr-1.5 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'checking…' : 'recheck'}
+        </Button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 border border-destructive/40 bg-destructive/5 px-4 py-3">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
+          <p className="font-code text-destructive text-xs">{error}</p>
+        </div>
+      )}
+
+      {CLI_SECTIONS.map((s) => {
+        const tool = tools.find((t) => t.id === s.toolId);
+        const status = tool?.status ?? null;
+        const section: SettingsSection = {
+          id: s.id,
+          label: s.label,
+          icon: s.icon,
+          description: s.description,
+        };
+        return (
+          <SectionCard
+            key={s.id}
+            section={section}
+            active={false}
+            dimmed={status === 'not_installed'}
+          >
+            {loading && !tool ? (
+              <p className="animate-pulse font-code text-2xs text-muted-foreground">
+                {'> checking…'}
+              </p>
+            ) : tool ? (
+              <CliStatusCard tool={tool} />
+            ) : (
+              <p className="font-code text-2xs text-muted-foreground/60">{'> no data'}</p>
+            )}
+          </SectionCard>
+        );
+      })}
+    </>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
+const SECTIONS: SettingsSection[] = [
+  {
+    id: 'dokku',
+    label: 'dokku',
+    icon: <Server className="h-4 w-4" />,
+    description: 'Infrastructure deployment',
+  },
+  {
+    id: 'github',
+    label: 'github_app',
+    icon: <Github className="h-4 w-4" />,
+    description: 'Repository management',
+  },
+];
+
+export default function Settings() {
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  // ── Dokku ──
+  const [dokkuHost, setDokkuHost] = useState('');
+  const [dokkuUser, setDokkuUser] = useState('dokku');
+  const [dokkuPort, setDokkuPort] = useState('22');
+
+  // ── GitHub App ──
+  const [ghAppId, setGhAppId] = useState('');
+  const [ghInstallationId, setGhInstallationId] = useState('');
+  const [ghClientId, setGhClientId] = useState('');
+  const [ghClientSecret, setGhClientSecret] = useState('');
+  const [ghPrivateKey, setGhPrivateKey] = useState('');
+  const [ghClientSecretVisible, setGhClientSecretVisible] = useState(false);
+
+  const handleSave = () => {
+    // TODO: POST /api/configuration
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const scrollTo = (id: string) => {
+    setActiveSection(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => setActiveSection(null), 1500);
+  };
+
+  const NAV_ITEMS = [
+    ...SECTIONS,
+    { id: 'claude', label: 'claude_code' },
+    { id: 'codex', label: 'codex' },
+    { id: 'gemini', label: 'gemini_cli' },
+    { id: 'opencode', label: 'open_code' },
+  ];
+
+  return (
+    <div
+      className="relative min-h-screen space-y-6 p-4 sm:space-y-8 sm:p-6"
+      style={{
+        backgroundImage:
+          'repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(55,247,18,0.018) 28px, rgba(55,247,18,0.018) 29px)',
+      }}
+    >
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <SectionHeader label="CONFIGURATION" />
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-2xl">
+            settings
+            <span
+              className="ml-1 animate-cursor-blink text-primary"
+              style={{ textShadow: 'var(--glow-primary)' }}
+            >
+              |
+            </span>
+          </h1>
+          <p className="hidden font-code text-muted-foreground text-xs sm:block">
+            agent_orchestrator :: system configuration
+          </p>
+        </div>
+
+        <Button
+          size="sm"
+          onClick={handleSave}
+          className="mt-1 shrink-0"
+          style={saved ? { boxShadow: '0 0 8px rgba(55,247,18,0.4)' } : undefined}
+        >
+          <Save className="mr-1.5 h-3 w-3" />
+          {saved ? 'saved' : 'save_all'}
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-6 lg:flex-row">
+        {/* ── Jump nav (desktop) ──────────────────────────────────── */}
+        <nav className="sticky top-6 hidden w-44 shrink-0 space-y-0.5 self-start lg:block">
+          <p className="mono-label mb-2 px-1">config.sections</p>
+          {NAV_ITEMS.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => scrollTo(s.id)}
+              className="flex w-full items-center gap-2 border border-transparent px-2 py-1.5 font-mono text-muted-foreground text-xs transition-all duration-150 hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <span className="font-code text-2xs text-muted-foreground/60">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              {s.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* ── Sections ────────────────────────────────────────────── */}
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* 01 · Dokku */}
+          <SectionCard section={SECTIONS[0]} active={activeSection === 'dokku'}>
+            <FieldGroup>
+              <Field id="dokku-host" label="host" hint="IP or hostname of your Dokku server">
+                <Input
+                  id="dokku-host"
+                  value={dokkuHost}
+                  onChange={(e) => setDokkuHost(e.target.value)}
+                  placeholder="dokku.example.com"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field id="dokku-user" label="ssh_user" hint="Usually 'dokku'">
+                <Input
+                  id="dokku-user"
+                  value={dokkuUser}
+                  onChange={(e) => setDokkuUser(e.target.value)}
+                  placeholder="dokku"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field id="dokku-port" label="ssh_port" hint="Default 22">
+                <Input
+                  id="dokku-port"
+                  value={dokkuPort}
+                  onChange={(e) => setDokkuPort(e.target.value)}
+                  placeholder="22"
+                  className="font-mono text-xs"
+                />
+              </Field>
+            </FieldGroup>
+            <div className="border border-border/50 bg-muted/30 px-3 py-2.5">
+              <p className="font-code text-2xs text-muted-foreground">
+                {
+                  '> ssh authentication uses the key installed on this machine (~/.ssh/id_rsa or ssh-agent)'
+                }
+              </p>
+            </div>
+          </SectionCard>
+
+          {/* 02 · GitHub App */}
+          <SectionCard section={SECTIONS[1]} active={activeSection === 'github'}>
+            <FieldGroup>
+              <Field id="gh-app-id" label="app_id" hint="GitHub App numeric ID">
+                <Input
+                  id="gh-app-id"
+                  value={ghAppId}
+                  onChange={(e) => setGhAppId(e.target.value)}
+                  placeholder="123456"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field
+                id="gh-installation-id"
+                label="installation_id"
+                hint="Installation ID for your org/user"
+              >
+                <Input
+                  id="gh-installation-id"
+                  value={ghInstallationId}
+                  onChange={(e) => setGhInstallationId(e.target.value)}
+                  placeholder="78901234"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field id="gh-client-id" label="client_id" hint="OAuth App client ID">
+                <Input
+                  id="gh-client-id"
+                  value={ghClientId}
+                  onChange={(e) => setGhClientId(e.target.value)}
+                  placeholder="Iv1.abc123def456"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field id="gh-client-secret" label="client_secret" hint="OAuth App client secret">
+                <div className="relative">
+                  <Input
+                    id="gh-client-secret"
+                    type={ghClientSecretVisible ? 'text' : 'password'}
+                    value={ghClientSecret}
+                    onChange={(e) => setGhClientSecret(e.target.value)}
+                    placeholder="••••••••••••••••••••••••••••••••••••••••"
+                    className="pr-10 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setGhClientSecretVisible((v) => !v)}
+                    className="-translate-y-1/2 absolute top-1/2 right-2 font-code text-2xs text-muted-foreground transition-colors duration-150 hover:text-foreground"
+                  >
+                    {ghClientSecretVisible ? 'hide' : 'show'}
+                  </button>
+                </div>
+              </Field>
+            </FieldGroup>
+            <Field
+              id="gh-private-key"
+              label="app_private_key"
+              hint="PEM-encoded private key generated for the GitHub App"
+              fullWidth
+            >
+              <Textarea
+                id="gh-private-key"
+                value={ghPrivateKey}
+                onChange={(e) => setGhPrivateKey(e.target.value)}
+                placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
+                className="min-h-[100px] resize-y font-mono text-xs"
+              />
+            </Field>
+          </SectionCard>
+
+          {/* 03–05 · CLI Tools */}
+          <CliToolsSection />
+
+          {/* Bottom save bar */}
+          <div className="flex items-center justify-between border border-border bg-card px-4 py-3 sm:px-5">
+            <p className="font-code text-2xs text-muted-foreground">
+              {'> changes are stored server-side'}
+            </p>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              style={saved ? { boxShadow: '0 0 8px rgba(55,247,18,0.4)' } : undefined}
+            >
+              <Save className="mr-1.5 h-3 w-3" />
+              {saved ? 'saved_!' : 'save_all'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,60 +1,23 @@
 {
-  "name": "agent-orchestrator",
-  "version": "0.1.0",
-  "description": "Hierarchical multi-agent system with personality-based AI agents",
+  "name": "zhc",
+  "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "workspaces": ["apps/server", "apps/web"],
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsup",
-    "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:db": "tsx scripts/test-db.ts",
-    "migrate": "tsx scripts/run-migration.ts",
+    "dev": "concurrently --names \"server,web\" --prefix-colors \"green,cyan\" \"npm run dev -w @zhc/server\" \"npm run dev -w @zhc/web\"",
+    "build": "npm run build -w @zhc/web && npm run build -w @zhc/server",
+    "start": "npm run start -w @zhc/server",
     "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
-    "format:check": "biome format --check .",
-    "check": "biome check --write .",
-    "typecheck": "tsc --noEmit",
-    "prepare": "husky",
-    "release": "semantic-release"
-  },
-  "keywords": ["agents", "ai", "orchestration", "multi-agent", "llm", "hierarchical"],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "dotenv": "^16.4.7",
-    "express": "^5.1.0",
-    "pg": "^8.13.3",
-    "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@commitlint/cli": "^19.8.0",
-    "@commitlint/config-conventional": "^19.8.0",
-    "@release-it/conventional-changelog": "^9.0.0",
-    "@types/express": "^5.0.1",
-    "@types/node": "^22.14.1",
-    "@types/pg": "^8.12.1",
-    "@vitest/coverage-v8": "^3.1.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^15.5.0",
-    "semantic-release": "^24.0.0",
-    "tsup": "^8.4.0",
-    "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
-    "vitest": "^3.1.2"
+    "typecheck": "npm run typecheck -w @zhc/web && npm run typecheck -w @zhc/server",
+    "test": "npm run test -w @zhc/server",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "engines": {
     "node": ">=20.11.0",
     "npm": ">=10.0.0"
   },
-  "files": ["dist", "README.md", "LICENSE"],
-  "publishConfig": {
-    "access": "public"
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "concurrently": "9.2.1"
   }
 }

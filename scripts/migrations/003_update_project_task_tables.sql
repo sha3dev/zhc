@@ -9,7 +9,7 @@
 -- 6. Renamed TSK_sort_order to TSK_sort, removed TSK_doc_reference
 -- 7. Added PRJ_slug for URL-friendly identifiers
 --
--- See DATABASE_CONVENTIONS.md for naming rules
+-- See docs/DATABASE_CONVENTIONS.md for naming rules
 
 BEGIN;
 

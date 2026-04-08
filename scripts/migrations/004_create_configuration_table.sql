@@ -6,7 +6,7 @@
 --
 -- There is only ONE configuration record in the system.
 --
--- See DATABASE_CONVENTIONS.md for naming rules
+-- See docs/DATABASE_CONVENTIONS.md for naming rules
 
 BEGIN;
 

@@ -5,7 +5,7 @@
 -- - All columns have 3-letter prefix (agn_)
 -- - Foreign keys maintain original table's prefix
 --
--- See DATABASE_CONVENTIONS.md for complete rules
+-- See docs/DATABASE_CONVENTIONS.md for complete rules
 
 BEGIN;
 
@@ -18,9 +18,6 @@ CREATE TABLE agent (
     agn_name VARCHAR(255) NOT NULL,
     agn_soul TEXT NOT NULL,
     agn_model VARCHAR(50) NOT NULL,
-
-    -- Hierarchy
-    agn_reports_to_agn_id INTEGER REFERENCES agent(agn_id),
 
     -- Status
     agn_status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -51,7 +48,6 @@ COMMENT ON COLUMN agent.agn_id IS 'Primary key';
 COMMENT ON COLUMN agent.agn_name IS 'Human-readable name for the agent';
 COMMENT ON COLUMN agent.agn_soul IS 'Personality definition in markdown format (traits, role, behavior)';
 COMMENT ON COLUMN agent.agn_model IS 'AI model used by this agent (e.g., claude-opus-4-6, gpt-4)';
-COMMENT ON COLUMN agent.agn_reports_to_agn_id IS 'Parent agent in hierarchy (who this agent reports to)';
 COMMENT ON COLUMN agent.agn_status IS 'Current status: active, inactive, or archived';
 COMMENT ON COLUMN agent.agn_created_at IS 'Timestamp when agent was created';
 COMMENT ON COLUMN agent.agn_updated_at IS 'Timestamp when agent was last updated';
@@ -60,8 +56,6 @@ COMMENT ON COLUMN agent.agn_updated_at IS 'Timestamp when agent was last updated
 CREATE INDEX idx_agent_agn_name ON agent(agn_name);
 CREATE INDEX idx_agent_agn_model ON agent(agn_model);
 CREATE INDEX idx_agent_agn_status ON agent(agn_status);
-CREATE INDEX idx_agent_agn_reports_to_agn_id ON agent(agn_reports_to_agn_id);
-
 -- Trigger to update agn_updated_at on row modification
 CREATE OR REPLACE FUNCTION update_agent_updated_at()
 RETURNS TRIGGER AS $$

@@ -75,7 +75,6 @@ export const productDesigner: Agent = {
   },
   model: "claude-sonnet-4-6",
   role: "Product Designer",
-  reportsTo: "ceo",
   manages: [],
 };
 ```

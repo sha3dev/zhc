@@ -6,7 +6,7 @@
 -- - All columns have 3-letter prefix identifying their table
 -- - Foreign keys maintain original table's prefix
 --
--- See DATABASE_CONVENTIONS.md for complete rules
+-- See docs/DATABASE_CONVENTIONS.md for complete rules
 
 BEGIN;
 

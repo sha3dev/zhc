@@ -8,7 +8,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { closeDatabase, query, transaction } from '../src/db/client.js';
+import { closeDatabase, query } from '../apps/server/src/shared/db/client.js';
 
 async function runMigration(migrationFile: string) {
   const migrationPath = resolve(process.cwd(), migrationFile);
@@ -17,10 +17,7 @@ async function runMigration(migrationFile: string) {
 
   try {
     const sql = readFileSync(migrationPath, 'utf-8');
-
-    await transaction(async (client) => {
-      await client.query(sql);
-    });
+    await query(sql);
 
     console.log('✅ Migration completed successfully');
   } catch (error) {
