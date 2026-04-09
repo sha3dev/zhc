@@ -261,38 +261,42 @@ export default function Executions() {
                     <Badge variant="secondary">{execution.cliId}</Badge>
                     <Badge variant="outline">{execution.model}</Badge>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <h2 className="font-mono text-sm font-bold text-foreground sm:text-base">
                       {execution.agentName}
                     </h2>
-                    <p className="mt-1 font-code text-2xs text-muted-foreground">
-                      {formatDate(execution.executedAt)} · {formatDuration(execution.durationMs)}
-                    </p>
+                    <div className="grid gap-2 text-left sm:grid-cols-2 xl:grid-cols-4">
+                      <div>
+                        <p className="mono-label">executed_at</p>
+                        <p className="mt-1 font-code text-xs text-muted-foreground">
+                          {formatDate(execution.executedAt)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="mono-label">duration</p>
+                        <p className="mt-1 font-code text-xs text-muted-foreground">
+                          {formatDuration(execution.durationMs)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="mono-label">agent_id</p>
+                        <p className="mt-1 font-code text-xs text-muted-foreground">
+                          {execution.agentId}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="mono-label">execution_id</p>
+                        <p className="mt-1 font-code text-xs text-muted-foreground">
+                          {execution.id}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1 font-code text-2xs uppercase tracking-widest text-primary">
                   open detail
                   <ArrowRight className="h-3 w-3" />
                 </span>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="space-y-2">
-                  <p className="mono-label">prompt preview</p>
-                  <div className="min-h-[120px] border border-border bg-background/70 px-4 py-3">
-                    <p className="font-code text-xs leading-6 text-muted-foreground">
-                      {execution.promptPreview || '—'}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="mono-label">response preview</p>
-                  <div className="min-h-[120px] border border-border bg-background/70 px-4 py-3">
-                    <p className="font-code text-xs leading-6 text-muted-foreground">
-                      {execution.responsePreview || '—'}
-                    </p>
-                  </div>
-                </div>
               </div>
             </button>
           ))
