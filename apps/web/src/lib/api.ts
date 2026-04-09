@@ -13,12 +13,6 @@ function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL;
   if (configured) return configured.replace(/\/$/, '');
 
-  if (import.meta.env.DEV) {
-    const url = new URL('/api', window.location.origin);
-    url.port = '3000';
-    return url.toString().replace(/\/$/, '');
-  }
-
   return '/api';
 }
 

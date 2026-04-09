@@ -1,9 +1,15 @@
 import 'dotenv/config';
 import { bootstrapDefaultAgents } from '../apps/server/src/modules/agents/application/bootstrap.js';
 import { SqlAgentsRepository } from '../apps/server/src/modules/agents/infrastructure/sql-agents.repository.js';
-import { closeDatabase } from '../apps/server/src/shared/db/client.js';
+import { closeDatabase, query } from '../apps/server/src/shared/db/client.js';
 
 async function main() {
+  const reset = process.argv.includes('--reset');
+
+  if (reset) {
+    await query('TRUNCATE TABLE agent CASCADE');
+  }
+
   const repository = new SqlAgentsRepository();
   const created = await bootstrapDefaultAgents(repository);
 

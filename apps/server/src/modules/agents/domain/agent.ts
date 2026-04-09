@@ -15,15 +15,20 @@ export const agentStatuses = ['ready', 'not_ready', 'suspended'] as const;
 export const agentStatusSchema = z.enum(agentStatuses);
 export type AgentStatus = z.infer<typeof agentStatusSchema>;
 
+export const agentKinds = ['ceo', 'specialist', 'expert'] as const;
+export const agentKindSchema = z.enum(agentKinds);
+export type AgentKind = z.infer<typeof agentKindSchema>;
+
 export interface Agent {
   createdAt: Date;
   id: number;
   isCeo: boolean;
+  kind: AgentKind;
   key: string;
   modelCliId: AgentModelCliId | null;
   model: AgentModel | null;
   name: string;
-  soul: string;
+  subagentMd: string;
   status: AgentStatus;
   updatedAt: Date;
 }
@@ -35,6 +40,7 @@ export interface AgentDetails extends Agent {
 export interface AgentSummary {
   id: number;
   isCeo: boolean;
+  kind: AgentKind;
   key: string;
   modelCliId: AgentModelCliId | null;
   model: AgentModel | null;
@@ -45,6 +51,7 @@ export interface AgentSummary {
 export interface AgentMemorySummary {
   id: number;
   isCeo: boolean;
+  kind: AgentKind;
   key: string;
   modelCliId: AgentModelCliId | null;
   model: AgentModel | null;
@@ -56,12 +63,14 @@ export interface AgentMemorySummary {
 export interface AgentHierarchyNode {
   children: AgentHierarchyNode[];
   id: number;
+  kind: AgentKind;
   name: string;
   role: string | null;
   status: AgentStatus;
 }
 
 export interface AgentStats {
+  agentsByKind: Record<AgentKind, number>;
   agentsByModel: Record<AgentModel, number>;
   agentsByStatus: Record<AgentStatus, number>;
   maxDepth: number;
@@ -73,11 +82,12 @@ export interface AgentRecord {
   agn_created_at: Date;
   agn_id: number;
   agn_is_ceo: boolean;
+  agn_kind: AgentKind;
   agn_key: string;
   agn_model_cli: AgentModelCliId | null;
   agn_model: AgentModel | null;
   agn_name: string;
-  agn_soul: string;
+  agn_subagent_md: string;
   agn_status: AgentStatus;
   agn_updated_at: Date;
 }

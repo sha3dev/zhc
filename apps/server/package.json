@@ -5,9 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/entrypoints/http/server.ts",
+    "dev": "NODE_ENV=development tsx watch --ignore ../web/node_modules/.vite-temp --ignore ../web/dist src/entrypoints/http/server.ts",
     "build": "tsup",
-    "start": "node dist/entrypoints/http/server.js",
+    "start": "NODE_ENV=production node dist/entrypoints/http/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -16,6 +16,7 @@
     "dotenv": "^16.4.7",
     "hono": "4.12.10",
     "pg": "^8.13.3",
+    "resend": "6.10.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -25,6 +26,7 @@
     "tsup": "^8.4.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
+    "vite": "^6.0.7",
     "vitest": "^3.1.2"
   }
 }

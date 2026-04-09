@@ -8,6 +8,7 @@ describe('SystemMemoryProvider', () => {
         {
           id: 1,
           isCeo: true,
+          kind: 'ceo',
           key: 'ceo',
           modelCliId: 'codex',
           model: 'gpt-5.4',
@@ -24,11 +25,12 @@ describe('SystemMemoryProvider', () => {
           createdAt: new Date(),
           id: 1,
           isCeo: true,
+          kind: 'ceo',
           key: 'ceo',
           modelCliId: 'codex',
           model: 'gpt-5.4',
           name: 'CEO',
-          soul: '# CEO',
+          subagentMd: '# CEO',
           status: 'ready',
           updatedAt: new Date(),
         },
@@ -55,11 +57,12 @@ describe('SystemMemoryProvider', () => {
           createdAt: new Date(),
           id: 1,
           isCeo: true,
+          kind: 'ceo',
           key: 'ceo',
           modelCliId: 'codex',
           model: 'gpt-5.4',
           name: 'CEO',
-          soul: '# CEO',
+          subagentMd: '# CEO',
           status: 'ready',
           updatedAt: new Date(),
         },
@@ -70,5 +73,59 @@ describe('SystemMemoryProvider', () => {
     );
 
     expect(blocks).toEqual([]);
+  });
+
+  it('builds available_experts separately from available_agents', async () => {
+    const provider = new SystemMemoryProvider({
+      listForMemory: vi.fn(async () => [
+        {
+          id: 1,
+          isCeo: true,
+          kind: 'ceo',
+          key: 'ceo',
+          modelCliId: 'codex',
+          model: 'gpt-5.4',
+          name: 'CEO',
+          role: 'Chief Executive Officer',
+          status: 'ready',
+        },
+        {
+          id: 9,
+          isCeo: false,
+          kind: 'expert',
+          key: 'crossfit-expert',
+          modelCliId: null,
+          model: null,
+          name: 'CrossFit Expert',
+          role: 'CrossFit Expert',
+          status: 'not_ready',
+        },
+      ]),
+    });
+
+    const blocks = await provider.build(
+      {
+        agent: {
+          createdAt: new Date(),
+          id: 1,
+          isCeo: true,
+          kind: 'ceo',
+          key: 'ceo',
+          modelCliId: 'codex',
+          model: 'gpt-5.4',
+          name: 'CEO',
+          subagentMd: '# CEO',
+          status: 'ready',
+          updatedAt: new Date(),
+        },
+        operationKey: 'create-expert-draft',
+        userInput: 'crossfit coach',
+      },
+      ['available_agents', 'available_experts'],
+    );
+
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.content).not.toContain('CrossFit Expert');
+    expect(blocks[1]?.content).toContain('CrossFit Expert');
   });
 });

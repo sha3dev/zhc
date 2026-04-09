@@ -1,3 +1,5 @@
+import { AgentCeoBadge } from '@/components/agents/AgentCeoBadge';
+import { AgentStatusPanel } from '@/components/agents/AgentStatusPanel';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,16 +24,12 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  deriveAgentStatusFromSuspension,
-  getAgentStatusLabel,
-  groupAvailableModels,
-} from '@/lib/agents';
+import { deriveAgentStatusFromSuspension, groupAvailableModels } from '@/lib/agents';
 import { fetchJson } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import type { AgentDetails, AgentStatus } from '@/types/agent';
 import type { Model } from '@/types/model';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Crown } from 'lucide-react';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -43,14 +41,16 @@ const CLI_LABELS: Record<string, string> = {
   claude_code: 'Claude Code',
   codex: 'Codex',
   gemini_cli: 'Gemini CLI',
+  kilo: 'Kilo Code',
   opencode: 'OpenCode',
 };
 
-function validate(f: { name: string; soul: string }): string {
+function validate(f: { name: string; subagentMd: string }): string {
   if (!f.name) return 'Agent name is required.';
   if (!/^[a-zA-Z0-9\s\-_]+$/.test(f.name))
     return 'Name can only contain letters, numbers, spaces, hyphens, and underscores.';
-  if (!f.soul || f.soul.trim().length < 50) return 'Soul markdown must be at least 50 characters.';
+  if (!f.subagentMd || f.subagentMd.trim().length < 50)
+    return 'Definition must be at least 50 characters.';
   return '';
 }
 
@@ -95,7 +95,7 @@ export default function AgentDetail() {
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     name: '',
-    soul: '',
+    subagentMd: '',
     modelCliId: '',
     model: '',
     isSuspended: false,
@@ -110,7 +110,7 @@ export default function AgentDetail() {
       setAgent(data);
       setForm({
         name: data.name,
-        soul: data.soul,
+        subagentMd: data.subagentMd,
         modelCliId: data.modelCliId ?? '',
         model: data.model ?? '',
         isSuspended: data.status === 'suspended',
@@ -177,7 +177,7 @@ export default function AgentDetail() {
       const payload = {
         modelCliId: form.model ? form.modelCliId : null,
         name: form.name,
-        soul: form.soul,
+        subagentMd: form.subagentMd,
         model: form.model || null,
         status: effectiveStatus,
       };
@@ -204,7 +204,7 @@ export default function AgentDetail() {
 
   return (
     <div
-      className="relative flex min-h-screen flex-col gap-5 p-4 sm:p-6"
+      className="relative flex min-h-full flex-col gap-5 p-4 sm:p-6"
       style={{
         backgroundImage:
           'repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(55,247,18,0.018) 28px, rgba(55,247,18,0.018) 29px)',
@@ -223,9 +223,11 @@ export default function AgentDetail() {
                 <Check className="h-3 w-3" /> saved
               </span>
             )}
-            <Button variant="destructive" size="sm" onClick={() => setShowDelete(true)}>
-              [ delete ]
-            </Button>
+            {!agent.isCeo && (
+              <Button variant="destructive" size="sm" onClick={() => setShowDelete(true)}>
+                [ delete ]
+              </Button>
+            )}
             <Button size="sm" onClick={handleSave} disabled={saving}>
               {saving ? '[ saving... ]' : '[ SAVE ]'}
             </Button>
@@ -246,15 +248,18 @@ export default function AgentDetail() {
           {/* Title + read-only meta chips */}
           <div className="shrink-0">
             <SectionHeader label="AGENT DETAIL" />
-            <h1 className="mt-1 break-words font-bold font-mono text-foreground text-xl sm:text-2xl">
-              {`[::] ${agent.name}`}
-              <span
-                className="ml-1 animate-cursor-blink text-primary"
-                style={{ textShadow: 'var(--glow-primary)' }}
-              >
-                |
-              </span>
-            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {agent.isCeo && <AgentCeoBadge />}
+              <h1 className="break-words font-bold font-mono text-foreground text-xl sm:text-2xl">
+                {agent.name}
+                <span
+                  className="ml-1 animate-cursor-blink text-primary"
+                  style={{ textShadow: 'var(--glow-primary)' }}
+                >
+                  |
+                </span>
+              </h1>
+            </div>
             <div className="mt-1.5 flex flex-wrap gap-3">
               <span className="font-code text-2xs text-muted-foreground">
                 created <span className="text-foreground">{formatDate(agent.createdAt)}</span>
@@ -271,6 +276,12 @@ export default function AgentDetail() {
               <span className="font-code text-2xs text-muted-foreground">
                 role <span className="text-foreground">{agent.isCeo ? 'CEO' : 'specialist'}</span>
               </span>
+              {agent.isCeo && (
+                <span className="inline-flex items-center gap-1 font-code text-2xs text-yellow-300">
+                  <Crown className="h-3 w-3" />
+                  protected from deletion
+                </span>
+              )}
             </div>
           </div>
 
@@ -315,27 +326,14 @@ export default function AgentDetail() {
             </div>
           </div>
 
-          <div className="grid shrink-0 grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <Label>effective status</Label>
-              <div className="flex h-7 items-center border border-border bg-card px-2 font-code text-xs">
-                {getAgentStatusLabel(effectiveStatus)}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label>availability override</Label>
-              <button
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, isSuspended: !current.isSuspended }))}
-                className={`h-7 border font-code text-2xs uppercase tracking-widest transition-all duration-150 ${
-                  form.isSuspended
-                    ? 'border-yellow-500 bg-yellow-500/10 text-yellow-500'
-                    : 'border-border text-muted-foreground hover:border-foreground/40'
-                }`}
-              >
-                {form.isSuspended ? 'suspended' : 'active'}
-              </button>
-            </div>
+          <div className="shrink-0">
+            <AgentStatusPanel
+              effectiveStatus={effectiveStatus}
+              isSuspended={form.isSuspended}
+              onToggleSuspended={() =>
+                setForm((current) => ({ ...current, isSuspended: !current.isSuspended }))
+              }
+            />
           </div>
 
           {/* Direct reports */}
@@ -350,7 +348,7 @@ export default function AgentDetail() {
                     onClick={() => navigate(`/agents/${child.id}`)}
                     className="border border-border px-2 py-0.5 font-mono text-foreground text-xs transition-all duration-150 hover:border-primary hover:text-primary active:scale-95"
                   >
-                    {`[::] ${child.name}`}
+                    {child.name}
                   </button>
                 ))}
               </div>
@@ -359,17 +357,17 @@ export default function AgentDetail() {
 
           <Separator className="shrink-0" />
 
-          {/* Soul editor */}
+          {/* Definition editor */}
           <div className="flex min-h-0 flex-1 flex-col gap-1">
-            <SectionHeader label="SOUL.MD" />
+            <SectionHeader label="DEFINITION" />
             <Suspense
               fallback={
                 <div className="min-h-[200px] flex-1 animate-skeleton border border-input" />
               }
             >
               <MarkdownEditor
-                value={form.soul}
-                onChange={(v) => setForm((f) => ({ ...f, soul: v }))}
+                value={form.subagentMd}
+                onChange={(v) => setForm((f) => ({ ...f, subagentMd: v }))}
                 fill
               />
             </Suspense>

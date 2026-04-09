@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AppContext } from '../../src/app/context.js';
 import { createHttpApp } from '../../src/app/http-app.js';
 import type { AgentsRepository } from '../../src/modules/agents/application/contracts.js';
+import { ExpertsService } from '../../src/modules/agents/application/experts-service.js';
 import { AgentsService } from '../../src/modules/agents/application/service.js';
 import { ExecutionsService } from '../../src/modules/executions/application/service.js';
+import type { ExecutionsRepository } from '../../src/modules/executions/index.js';
 import { ModelsService } from '../../src/modules/models/application/service.js';
 import type {
   ProjectTasksGateway,
@@ -20,6 +22,7 @@ function createContext(): AppContext {
     count: vi.fn(),
     create: vi.fn(),
     findAll: vi.fn(),
+    findCeo: vi.fn(),
     findById: vi.fn(),
     findByIdWithRelations: vi.fn(),
     findForMemory: vi.fn(),
@@ -57,16 +60,27 @@ function createContext(): AppContext {
     updateStatus: tasksRepository.updateStatus,
   };
 
+  const executions = new ExecutionsService(
+    { getById: vi.fn(), listForMemory: vi.fn() },
+    { listStatus: vi.fn() },
+    { get: vi.fn(), getFragment: vi.fn() },
+    { build: vi.fn() },
+    {
+      create: vi.fn(),
+      findById: vi.fn(),
+      list: vi.fn(),
+    } as ExecutionsRepository,
+    [],
+  );
+
   return {
     agents: new AgentsService(agentsRepository),
     bootstrap: vi.fn(async () => undefined),
-    executions: new ExecutionsService(
-      { getById: vi.fn(), listForMemory: vi.fn() },
-      { listStatus: vi.fn() },
-      { get: vi.fn(), getFragment: vi.fn() },
-      { build: vi.fn() },
-      [],
-    ),
+    configuration: { get: vi.fn(), update: vi.fn() } as never,
+    emailPoller: { start: vi.fn(), stop: vi.fn() } as never,
+    emails: { getById: vi.fn(), list: vi.fn(), syncInbound: vi.fn() } as never,
+    executions,
+    experts: new ExpertsService(agentsRepository, executions),
     models: new ModelsService({ listStatus: vi.fn() } as unknown as ToolsService),
     projects: new ProjectsService(projectsRepository, projectTasksGateway),
     tasks: new TasksService(tasksRepository),
@@ -97,6 +111,76 @@ describe('HTTP app', () => {
     await expect(response.json()).resolves.toMatchObject({
       items: [],
       total: 0,
+    });
+  });
+
+  it('returns expert listing envelopes', async () => {
+    const context = createContext();
+    vi.spyOn(context.experts, 'list').mockResolvedValue({
+      agents: [],
+      total: 0,
+    });
+    const app = createHttpApp(context);
+
+    const response = await app.request('/api/experts');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      items: [],
+      total: 0,
+    });
+  });
+
+  it('returns execution listing envelopes', async () => {
+    const context = createContext();
+    vi.spyOn(context.executions, 'list').mockResolvedValue({
+      executions: [],
+      total: 0,
+    });
+    const app = createHttpApp(context);
+
+    const response = await app.request('/api/executions');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      items: [],
+      total: 0,
+    });
+  });
+
+  it('returns execution details', async () => {
+    const context = createContext();
+    vi.spyOn(context.executions, 'getById').mockResolvedValue({
+      agentId: 1,
+      agentName: 'CEO',
+      cliId: 'codex',
+      composedPrompt: 'prompt',
+      context: null,
+      durationMs: 10,
+      executedAt: new Date('2026-04-09T10:00:00.000Z'),
+      id: 1,
+      model: 'gpt-5.4',
+      operationKey: 'create-project',
+      parsedOutput: null,
+      promptBlocks: [],
+      promptPath: '/tmp/create-project.md',
+      promptPreview: 'prompt',
+      rawOutput: 'response',
+      responsePreview: 'response',
+      sandboxMode: 'read-only',
+      userInput: 'build app',
+      validationError: null,
+      workingDirectory: '/tmp',
+    });
+    const app = createHttpApp(context);
+
+    const response = await app.request('/api/executions/1');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: 1,
+      model: 'gpt-5.4',
+      operationKey: 'create-project',
     });
   });
 });

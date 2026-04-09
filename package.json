@@ -4,9 +4,11 @@
   "type": "module",
   "workspaces": ["apps/server", "apps/web"],
   "scripts": {
-    "dev": "concurrently --names \"server,web\" --prefix-colors \"green,cyan\" \"npm run dev -w @zhc/server\" \"npm run dev -w @zhc/web\"",
+    "dev": "npm run dev -w @zhc/server",
     "build": "npm run build -w @zhc/web && npm run build -w @zhc/server",
     "start": "npm run start -w @zhc/server",
+    "seed:agents": "npm exec -w @zhc/server tsx ../../scripts/seed-agents.ts",
+    "seed:agents:reset": "npm exec -w @zhc/server tsx ../../scripts/seed-agents.ts -- --reset",
     "lint": "biome check .",
     "typecheck": "npm run typecheck -w @zhc/web && npm run typecheck -w @zhc/server",
     "test": "npm run test -w @zhc/server",

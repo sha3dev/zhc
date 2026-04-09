@@ -1,4 +1,5 @@
 export { AgentsService } from './application/service.js';
+export { ExpertsService } from './application/experts-service.js';
 export { bootstrapDefaultAgents } from './application/bootstrap.js';
 export type {
   AgentsRepository,
@@ -14,6 +15,7 @@ export {
 export type {
   Agent,
   AgentDetails,
+  AgentKind,
   AgentHierarchyNode,
   AgentMemorySummary,
   AgentModel,
@@ -21,8 +23,15 @@ export type {
   AgentStatus,
   AgentSummary,
 } from './domain/agent.js';
-export { agentModelSchema, agentStatusSchema, agentStatuses } from './domain/agent.js';
+export {
+  agentKindSchema,
+  agentKinds,
+  agentModelSchema,
+  agentStatusSchema,
+  agentStatuses,
+} from './domain/agent.js';
 export type { DefaultAgentDefinition } from './domain/default-agents.js';
-export { defaultAgentNames, getDefaultAgentsWithSouls } from './domain/default-agents.js';
+export { defaultAgentNames, getDefaultAgentsWithDefinitions } from './domain/default-agents.js';
 export { SqlAgentsRepository } from './infrastructure/sql-agents.repository.js';
 export { createAgentsRouter } from './presentation/http.js';
+export { createExpertsRouter } from './presentation/experts-http.js';

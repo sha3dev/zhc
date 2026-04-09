@@ -17,6 +17,10 @@ Rules:
 - Produce a short descriptive project name.
 - Produce a `definitionBrief` that expands the human request into a clear execution brief.
 - Produce an initial task tree that can be delegated to specialist agents.
+- You will receive both the available operational agents and the available experts.
+- Experts are external advisors to the CEO, not members of the main execution team.
+- When a project depends on deep domain knowledge, create an explicit consultation/research/advisory task for the relevant expert before downstream implementation tasks.
+- Expert tasks can be assigned with `assignedToAgentKey` just like specialist tasks.
 - Each task must include:
   - `key`: stable task identifier inside this response
   - `title`
@@ -28,6 +32,7 @@ Rules:
 - Use `assignedToAgentKey` when you can identify the agent by role more reliably than by numeric id.
 - Only reference dependency keys that exist in the same response.
 - Prefer a small, dependency-aware task tree over a long speculative list.
+- Do not assign implementation work to an expert unless the work is genuinely advisory in nature.
 
 Expected JSON shape:
 {

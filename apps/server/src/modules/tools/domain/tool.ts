@@ -63,6 +63,13 @@ export const CLI_TOOLS: CliTool[] = [
     modelsCommand: 'opencode models',
   },
   {
+    id: 'kilo',
+    name: 'Kilo Code',
+    command: 'kilo',
+    // Kilo exposes `kilo models` and `kilo auth`; models exit code is enough for configured detection
+    modelsCommand: 'kilo models',
+  },
+  {
     id: 'gemini_cli',
     name: 'Gemini CLI',
     command: 'gemini',

@@ -8,9 +8,22 @@ function serializeValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-export function createIdentityBlock(soul: string): PromptBlock {
+function isSerializedEmptyValue(content: string): boolean {
+  const trimmed = content.trim();
+  return trimmed === '' || trimmed === 'null' || trimmed === '[]' || trimmed === '{}';
+}
+
+function shouldIncludeBlock(block: PromptBlock): boolean {
+  if (block.kind === 'context' || block.kind === 'memory') {
+    return !isSerializedEmptyValue(block.content);
+  }
+
+  return block.content.trim().length > 0;
+}
+
+export function createIdentityBlock(subagentMd: string): PromptBlock {
   return {
-    content: soul.trim(),
+    content: subagentMd.trim(),
     key: 'agent-identity',
     kind: 'identity',
     title: 'Agent Identity',
@@ -53,14 +66,14 @@ export function composePromptBlocks(params: {
   context: unknown;
   memoryBlocks: MemoryBlock[];
   operationKey: string;
-  soul: string;
+  subagentMd: string;
   userInput: string;
 }): PromptBlock[] {
   return [
-    createIdentityBlock(params.soul),
+    createIdentityBlock(params.subagentMd),
     createCommandBlock(params.operationKey, params.command),
     ...params.memoryBlocks,
     createContextBlock(params.context),
     createUserInputBlock(params.userInput),
-  ];
+  ].filter(shouldIncludeBlock);
 }

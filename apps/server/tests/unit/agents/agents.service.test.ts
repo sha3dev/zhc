@@ -8,6 +8,7 @@ const createRepository = (): AgentsRepository => ({
   count: vi.fn(),
   create: vi.fn(),
   findAll: vi.fn(),
+  findCeo: vi.fn(),
   findById: vi.fn(),
   findByIdWithRelations: vi.fn(),
   findForMemory: vi.fn(),
@@ -35,7 +36,11 @@ describe('AgentsService', () => {
 
     const result = await service.list({ limit: 20, offset: 0 });
 
-    expect(repository.findAll).toHaveBeenCalledWith({ limit: 20, offset: 0 });
+    expect(repository.findAll).toHaveBeenCalledWith({
+      kinds: ['ceo', 'specialist'],
+      limit: 20,
+      offset: 0,
+    });
     expect(result.total).toBe(0);
   });
 });

@@ -5,11 +5,12 @@ export function toAgent(record: AgentRecord): Agent {
     createdAt: record.agn_created_at,
     id: record.agn_id,
     isCeo: record.agn_is_ceo,
+    kind: record.agn_kind,
     key: record.agn_key,
     modelCliId: record.agn_model_cli,
     model: record.agn_model,
     name: record.agn_name,
-    soul: record.agn_soul,
+    subagentMd: record.agn_subagent_md,
     status: record.agn_status,
     updatedAt: record.agn_updated_at,
   };
@@ -19,6 +20,7 @@ export function toAgentSummary(agent: Agent): AgentSummary {
   return {
     id: agent.id,
     isCeo: agent.isCeo,
+    kind: agent.kind,
     key: agent.key,
     modelCliId: agent.modelCliId,
     model: agent.model,
@@ -27,7 +29,7 @@ export function toAgentSummary(agent: Agent): AgentSummary {
   };
 }
 
-export function extractRoleFromSoul(soul: string): string | null {
-  const roleMatch = soul.match(/#+\s*Role\s*\n+(.+)/i);
+export function extractRoleFromDefinition(subagentMd: string): string | null {
+  const roleMatch = subagentMd.match(/#+\s*Role\s*\n+(.+)/i);
   return roleMatch?.[1]?.trim() ?? null;
 }

@@ -20,7 +20,7 @@ import type {
   AgentStats,
 } from '../domain/agent.js';
 import { agentStatuses } from '../domain/agent.js';
-import { extractRoleFromSoul, toAgent, toAgentSummary } from './mappers.js';
+import { extractRoleFromDefinition, toAgent, toAgentSummary } from './mappers.js';
 
 export class SqlAgentsRepository implements AgentsRepository {
   private readonly tableName = 'agent';
@@ -29,11 +29,12 @@ export class SqlAgentsRepository implements AgentsRepository {
     createdAt: getTimestampColumn(this.tableName, 'created_at'),
     id: getPrimaryKeyColumn(this.tableName),
     isCeo: getColumnName(this.tableName, 'is_ceo'),
+    kind: getColumnName(this.tableName, 'kind'),
     key: getColumnName(this.tableName, 'key'),
     modelCli: getColumnName(this.tableName, 'model_cli'),
     model: getColumnName(this.tableName, 'model'),
     name: getColumnName(this.tableName, 'name'),
-    soul: getColumnName(this.tableName, 'soul'),
+    subagentMd: getColumnName(this.tableName, 'subagent_md'),
     status: getColumnName(this.tableName, 'status'),
     updatedAt: getTimestampColumn(this.tableName, 'updated_at'),
   };
@@ -71,20 +72,22 @@ export class SqlAgentsRepository implements AgentsRepository {
       `
         INSERT INTO ${this.tableName} (
           ${this.columns.name},
-          ${this.columns.soul},
+          ${this.columns.subagentMd},
           ${this.columns.key},
           ${this.columns.isCeo},
+          ${this.columns.kind},
           ${this.columns.modelCli},
           ${this.columns.model},
           ${this.columns.status}
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `,
       [
         input.name,
-        input.soul,
+        input.subagentMd,
         input.key ?? this.createKey(input.name),
         input.isCeo ?? false,
+        input.kind,
         input.modelCliId,
         input.model,
         input.status,
@@ -96,7 +99,7 @@ export class SqlAgentsRepository implements AgentsRepository {
 
   async findAll(filters: ListAgentsQuery): Promise<{ agents: Agent[]; total: number }> {
     const clauses: string[] = [];
-    const params: Array<number | string> = [];
+    const params: Array<number | string | string[]> = [];
     let index = 1;
 
     if (filters.model) {
@@ -109,9 +112,14 @@ export class SqlAgentsRepository implements AgentsRepository {
       params.push(filters.status);
     }
 
+    if (filters.kinds && filters.kinds.length > 0) {
+      clauses.push(`${this.columns.kind} = ANY($${index++}::text[])`);
+      params.push(filters.kinds);
+    }
+
     if (filters.search) {
       clauses.push(
-        `(${this.columns.name} ILIKE $${index++} OR ${this.columns.soul} ILIKE $${index++})`,
+        `(${this.columns.name} ILIKE $${index++} OR ${this.columns.subagentMd} ILIKE $${index++})`,
       );
       params.push(`%${filters.search}%`, `%${filters.search}%`);
     }
@@ -150,6 +158,14 @@ export class SqlAgentsRepository implements AgentsRepository {
     return result.rows[0] ? toAgent(result.rows[0]) : null;
   }
 
+  async findCeo(): Promise<Agent | null> {
+    const result = await query<AgentRecord>(
+      `SELECT * FROM ${this.tableName} WHERE ${this.columns.kind} = 'ceo' LIMIT 1`,
+    );
+
+    return result.rows[0] ? toAgent(result.rows[0]) : null;
+  }
+
   async findByIdWithRelations(id: number): Promise<AgentDetails | null> {
     const agent = await this.findById(id);
 
@@ -162,7 +178,7 @@ export class SqlAgentsRepository implements AgentsRepository {
           `
             SELECT *
             FROM ${this.tableName}
-            WHERE ${this.columns.isCeo} = false
+            WHERE ${this.columns.kind} = 'specialist'
             ORDER BY ${this.columns.name} ASC
           `,
         )
@@ -189,11 +205,12 @@ export class SqlAgentsRepository implements AgentsRepository {
       return {
         id: agent.id,
         isCeo: agent.isCeo,
+        kind: agent.kind,
         key: agent.key,
         modelCliId: agent.modelCliId,
         model: agent.model,
         name: agent.name,
-        role: extractRoleFromSoul(agent.soul),
+        role: extractRoleFromDefinition(agent.subagentMd),
         status: agent.status,
       };
     });
@@ -209,8 +226,9 @@ export class SqlAgentsRepository implements AgentsRepository {
     const buildNode = (agent: Agent, children: Agent[] = []): AgentHierarchyNode => ({
       children: children.map((child) => buildNode(child)),
       id: agent.id,
+      kind: agent.kind,
       name: agent.name,
-      role: extractRoleFromSoul(agent.soul),
+      role: extractRoleFromDefinition(agent.subagentMd),
       status: agent.status,
     });
 
@@ -218,7 +236,12 @@ export class SqlAgentsRepository implements AgentsRepository {
       return agents.map((agent) => buildNode(agent));
     }
 
-    return [buildNode(ceo, agents.filter((agent) => !agent.isCeo))];
+    return [
+      buildNode(
+        ceo,
+        agents.filter((agent) => agent.kind === 'specialist'),
+      ),
+    ];
   }
 
   async getStats(): Promise<AgentStats> {
@@ -227,12 +250,18 @@ export class SqlAgentsRepository implements AgentsRepository {
     );
     const agents = result.rows.map(toAgent);
 
+    const agentsByKind = {
+      ceo: 0,
+      expert: 0,
+      specialist: 0,
+    } as AgentStats['agentsByKind'];
     const agentsByModel: Record<string, number> = {};
     const agentsByStatus = Object.fromEntries(
       agentStatuses.map((status) => [status, 0]),
     ) as AgentStats['agentsByStatus'];
 
     for (const agent of agents) {
+      agentsByKind[agent.kind] += 1;
       if (agent.model && agent.modelCliId) {
         const key = `${agent.modelCliId}:${agent.model}`;
         agentsByModel[key] = (agentsByModel[key] ?? 0) + 1;
@@ -245,6 +274,7 @@ export class SqlAgentsRepository implements AgentsRepository {
     const maxDepth = ceo ? (agents.length > 1 ? 2 : 1) : topLevelAgents.length > 0 ? 1 : 0;
 
     return {
+      agentsByKind,
       agentsByModel,
       agentsByStatus,
       maxDepth,
@@ -263,9 +293,14 @@ export class SqlAgentsRepository implements AgentsRepository {
       params.push(input.name);
     }
 
-    if (input.soul !== undefined) {
-      updates.push(`${this.columns.soul} = $${index++}`);
-      params.push(input.soul);
+    if (input.subagentMd !== undefined) {
+      updates.push(`${this.columns.subagentMd} = $${index++}`);
+      params.push(input.subagentMd);
+    }
+
+    if (input.kind !== undefined) {
+      updates.push(`${this.columns.kind} = $${index++}`);
+      params.push(input.kind);
     }
 
     if (input.model !== undefined) {

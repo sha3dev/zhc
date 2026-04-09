@@ -1,3 +1,5 @@
+import { AgentCeoBadge } from '@/components/agents/AgentCeoBadge';
+import { AgentStatusPanel } from '@/components/agents/AgentStatusPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Trash2 } from 'lucide-react';
+import { Lock, Plus, Search, Trash2 } from 'lucide-react';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 const MarkdownEditor = lazy(() =>
   import('@/components/ui/markdown-editor').then((m) => ({ default: m.MarkdownEditor })),
@@ -39,6 +41,7 @@ import {
 import {
   deriveAgentStatusFromSuspension,
   getAgentStatusLabel,
+  getAgentStatusVariant,
   groupAvailableModels,
 } from '@/lib/agents';
 import { fetchJson } from '@/lib/api';
@@ -49,29 +52,31 @@ const CLI_LABELS: Record<string, string> = {
   claude_code: 'Claude Code',
   codex: 'Codex',
   gemini_cli: 'Gemini CLI',
+  kilo: 'Kilo Code',
   opencode: 'OpenCode',
 };
 
-function statusVariant(s: string): 'success' | 'warning' | 'secondary' {
-  if (s === 'ready') return 'success';
-  if (s === 'not_ready') return 'warning';
-  return 'secondary';
-}
-
 interface AgentForm {
   name: string;
-  soul: string;
+  subagentMd: string;
   modelCliId: string;
   model: string;
   isSuspended: boolean;
 }
-const BLANK: AgentForm = { name: '', soul: '', modelCliId: '', model: '', isSuspended: false };
+const BLANK: AgentForm = {
+  name: '',
+  subagentMd: '',
+  modelCliId: '',
+  model: '',
+  isSuspended: false,
+};
 
 function validate(f: AgentForm): string {
   if (!f.name) return 'Agent name is required.';
   if (!/^[a-zA-Z0-9\s\-_]+$/.test(f.name))
     return 'Name can only contain letters, numbers, spaces, hyphens, and underscores.';
-  if (!f.soul || f.soul.trim().length < 50) return 'Soul markdown must be at least 50 characters.';
+  if (!f.subagentMd || f.subagentMd.trim().length < 50)
+    return 'Definition must be at least 50 characters.';
   return '';
 }
 
@@ -158,7 +163,7 @@ export default function Agents() {
       const payload: CreateAgentInput = {
         modelCliId: form.model ? form.modelCliId : null,
         name: form.name,
-        soul: form.soul,
+        subagentMd: form.subagentMd,
         model: form.model || null,
         status: effectiveStatus as CreateAgentInput['status'],
       };
@@ -205,7 +210,7 @@ export default function Agents() {
 
   return (
     <div
-      className="relative min-h-screen p-4 sm:p-6 space-y-5 sm:space-y-6"
+      className="relative min-h-full p-4 sm:p-6 space-y-5 sm:space-y-6"
       style={{
         backgroundImage:
           'repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(55,247,18,0.018) 28px, rgba(55,247,18,0.018) 29px)',
@@ -265,7 +270,7 @@ export default function Agents() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="name or soul content"
+              placeholder="name or definition content"
               className="pl-6"
             />
           </div>
@@ -321,7 +326,12 @@ export default function Agents() {
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
                   <TableCell>
-                    <span className="font-mono text-xs font-bold text-foreground">{`[::] ${agent.name}`}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {agent.isCeo && <AgentCeoBadge />}
+                      <span className="font-mono text-xs font-bold text-foreground">
+                        {agent.name}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="font-code text-xs text-muted-foreground hidden sm:table-cell">
                     {agent.model && agent.modelCliId ? (
@@ -331,23 +341,29 @@ export default function Agents() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(agent.status)}>
+                    <Badge variant={getAgentStatusVariant(agent.status)}>
                       {getAgentStatusLabel(agent.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAgentToDelete(agent);
-                        setShowDelete(true);
-                      }}
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive hover:border-transparent"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    {agent.isCeo ? (
+                      <div className="flex h-6 w-6 items-center justify-center text-warning">
+                        <Lock className="h-3 w-3" />
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAgentToDelete(agent);
+                          setShowDelete(true);
+                        }}
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive hover:border-transparent"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -394,7 +410,9 @@ export default function Agents() {
                   <div className="flex flex-col gap-1">
                     <Label htmlFor="c-model">model</Label>
                     <Select
-                      value={form.model && form.modelCliId ? `${form.modelCliId}:${form.model}` : 'none'}
+                      value={
+                        form.model && form.modelCliId ? `${form.modelCliId}:${form.model}` : 'none'
+                      }
                       onValueChange={(v) => {
                         if (v === 'none') {
                           setForm((f) => ({ ...f, model: '', modelCliId: '' }));
@@ -424,43 +442,30 @@ export default function Agents() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <Label>effective status</Label>
-                    <div className="flex h-7 items-center border border-border bg-card px-2 font-code text-xs">
-                      {getAgentStatusLabel(effectiveStatus)}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label>availability override</Label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm((current) => ({ ...current, isSuspended: !current.isSuspended }))
-                      }
-                      className={`h-7 border font-code text-2xs uppercase tracking-widest transition-all duration-150 ${
-                        form.isSuspended
-                          ? 'border-yellow-500 bg-yellow-500/10 text-yellow-500'
-                          : 'border-border text-muted-foreground hover:border-foreground/40'
-                      }`}
-                    >
-                      {form.isSuspended ? 'suspended' : 'active'}
-                    </button>
-                  </div>
+                </div>
+                <div className="mt-3">
+                  <AgentStatusPanel
+                    effectiveStatus={effectiveStatus}
+                    isSuspended={form.isSuspended}
+                    onToggleSuspended={() =>
+                      setForm((current) => ({ ...current, isSuspended: !current.isSuspended }))
+                    }
+                  />
                 </div>
               </div>
               <Separator />
               <div className="flex flex-col flex-1 min-h-0 gap-1">
-                <p className="mono-label">{'> soul.md'}</p>
+                <p className="mono-label">{'> definition'}</p>
                 <Suspense
                   fallback={
                     <div className="flex-1 border border-input animate-skeleton min-h-[200px]" />
                   }
                 >
                   <MarkdownEditor
-                    value={form.soul}
-                    onChange={(v) => setForm((f) => ({ ...f, soul: v }))}
+                    value={form.subagentMd}
+                    onChange={(v) => setForm((f) => ({ ...f, subagentMd: v }))}
                     placeholder={
-                      '# Frontend Developer Soul\n\n## Identity\nYou implement clear and fast interfaces.\n\n## Personality\n- Performance-conscious\n- Accessible-first\n- Pragmatic'
+                      '# Frontend Developer\n\n## Identity\nYou implement clear and fast interfaces.\n\n## Personality\n- Performance-conscious\n- Accessible-first\n- Pragmatic'
                     }
                     fill
                   />

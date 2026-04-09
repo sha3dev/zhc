@@ -13,6 +13,12 @@ export function getAgentStatusLabel(status: AgentStatus): string {
   return AGENT_STATUS_LABELS[status];
 }
 
+export function getAgentStatusVariant(status: AgentStatus): 'success' | 'warning' | 'secondary' {
+  if (status === 'ready') return 'success';
+  if (status === 'not_ready') return 'warning';
+  return 'secondary';
+}
+
 export function deriveAgentStatus(
   modelCliId: string,
   model: string,

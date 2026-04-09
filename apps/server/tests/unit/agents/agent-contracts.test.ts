@@ -8,10 +8,11 @@ import {
 describe('Agent contracts', () => {
   it('accepts valid create input with a model', () => {
     const result = createAgentInputSchema.safeParse({
+      kind: 'specialist',
       modelCliId: 'claude_code',
       model: 'claude-sonnet-4-6',
       name: 'Frontend Developer',
-      soul: '# Role\nFrontend Developer\n\n## Personality\n- Careful\n- Clear\n- Fast enough',
+      subagentMd: '# Role\nFrontend Developer\n\n## Personality\n- Careful\n- Clear\n- Fast enough',
       status: 'ready',
     });
 
@@ -20,8 +21,9 @@ describe('Agent contracts', () => {
 
   it('accepts create input with no model (not_ready)', () => {
     const result = createAgentInputSchema.safeParse({
+      kind: 'specialist',
       name: 'Frontend Developer',
-      soul: '# Role\nFrontend Developer\n\n## Personality\n- Careful\n- Clear\n- Fast enough',
+      subagentMd: '# Role\nFrontend Developer\n\n## Personality\n- Careful\n- Clear\n- Fast enough',
     });
 
     expect(result.success).toBe(true);
@@ -34,9 +36,34 @@ describe('Agent contracts', () => {
 
   it('rejects partial model selections', () => {
     const result = createAgentInputSchema.safeParse({
+      kind: 'specialist',
       model: 'gpt-5.4',
       name: 'Frontend Developer',
-      soul: '# Role\nFrontend Developer\n\n## Personality\n- Careful\n- Clear\n- Fast enough',
+      subagentMd: '# Role\nFrontend Developer\n\n## Personality\n- Careful\n- Clear\n- Fast enough',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts experts without their own model', () => {
+    const result = createAgentInputSchema.safeParse({
+      kind: 'expert',
+      name: 'Crossfit Expert',
+      subagentMd:
+        '# Role\nCrossfit Expert\n\n## Identity\nCoach with 20 years of experience.\n\n## Expertise\n- Programming\n- Competition\n- Injury prevention',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects experts with their own model selection', () => {
+    const result = createAgentInputSchema.safeParse({
+      kind: 'expert',
+      model: 'gpt-5.4',
+      modelCliId: 'codex',
+      name: 'Crossfit Expert',
+      subagentMd:
+        '# Role\nCrossfit Expert\n\n## Identity\nCoach with 20 years of experience.\n\n## Expertise\n- Programming\n- Competition\n- Injury prevention',
     });
 
     expect(result.success).toBe(false);

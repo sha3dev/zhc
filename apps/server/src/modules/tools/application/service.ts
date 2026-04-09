@@ -148,6 +148,32 @@ async function readCodexModels(): Promise<string[]> {
   }
 }
 
+interface GeminiSettingsFile {
+  selectedAuthType?: string;
+}
+
+async function hasGeminiPersonalLogin(): Promise<boolean> {
+  try {
+    const settingsPath = join(homedir(), '.gemini', 'settings.json');
+    const credsPath = join(homedir(), '.gemini', 'oauth_creds.json');
+
+    const [settingsRaw, credsRaw] = await Promise.all([
+      readFile(settingsPath, 'utf-8'),
+      readFile(credsPath, 'utf-8'),
+    ]);
+
+    const settings = JSON.parse(settingsRaw) as GeminiSettingsFile;
+    if (settings.selectedAuthType !== 'oauth-personal') {
+      return false;
+    }
+
+    const creds = JSON.parse(credsRaw) as Record<string, unknown>;
+    return Object.keys(creds).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Spawns the CLI's models command with stdin closed (prevents CPR/TUI hangs)
  * and a hard 5s SIGKILL timeout.
@@ -273,9 +299,7 @@ async function fetchToolStatus(tool: CliTool): Promise<CliToolStatus> {
       models = [];
     }
   } else if (tool.id === 'gemini_cli') {
-    authenticated = Boolean(
-      process.env['GEMINI_API_KEY'] || process.env['GOOGLE_API_KEY'],
-    );
+    authenticated = await hasGeminiPersonalLogin();
     models = authenticated ? (tool.knownModels ?? []) : [];
   } else if (tool.modelsCommand) {
     // opencode (and any future tool): modelsCommand exit code doubles as auth signal

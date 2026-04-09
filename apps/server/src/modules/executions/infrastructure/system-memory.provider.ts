@@ -1,5 +1,5 @@
 import type { AgentMemorySummary } from '../../agents/domain/agent.js';
-import type { MemoryProvider, MemoryBuildInput } from '../application/contracts.js';
+import type { MemoryBuildInput, MemoryProvider } from '../application/contracts.js';
 import type { MemoryBlock } from '../domain/execution.js';
 
 interface AgentMemoryReader {
@@ -11,6 +11,7 @@ function serializeAvailableAgents(agents: AgentMemorySummary[]): string {
     agents.map((agent) => ({
       id: agent.id,
       isCeo: agent.isCeo,
+      kind: agent.kind,
       key: agent.key,
       modelCliId: agent.modelCliId,
       model: agent.model,
@@ -28,16 +29,28 @@ export class SystemMemoryProvider implements MemoryProvider {
 
   async build(_input: MemoryBuildInput, memoryKeys: string[]): Promise<MemoryBlock[]> {
     const blocks: MemoryBlock[] = [];
+    const requestedAgentMemory =
+      memoryKeys.includes('available_agents') || memoryKeys.includes('available_experts');
+    const agents = requestedAgentMemory ? await this.agents.listForMemory() : [];
 
     for (const memoryKey of memoryKeys) {
       if (memoryKey === 'available_agents') {
-        const agents = await this.agents.listForMemory();
         blocks.push({
-          content: serializeAvailableAgents(agents),
+          content: serializeAvailableAgents(agents.filter((agent) => agent.kind !== 'expert')),
           key: memoryKey,
           kind: 'memory',
           source: 'dynamic',
           title: 'Memory: Available Agents',
+        });
+      }
+
+      if (memoryKey === 'available_experts') {
+        blocks.push({
+          content: serializeAvailableAgents(agents.filter((agent) => agent.kind === 'expert')),
+          key: memoryKey,
+          kind: 'memory',
+          source: 'dynamic',
+          title: 'Memory: Available Experts',
         });
       }
     }

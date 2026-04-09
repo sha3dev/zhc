@@ -1,6 +1,7 @@
 import type { Agent, AgentMemorySummary } from '../../agents/domain/agent.js';
 import type { CliToolStatus } from '../../tools/index.js';
 import type { MemoryBlock } from '../domain/execution.js';
+import type { ExecutionsRepository } from './execution-contracts.js';
 
 export interface PromptAsset {
   operationKey: string;
@@ -62,3 +63,5 @@ export interface ModelRunner {
   readonly cliId: string;
   run(input: ModelRunRequest): Promise<ModelRunResponse>;
 }
+
+export interface ExecutionRepositoryLookup extends ExecutionsRepository {}

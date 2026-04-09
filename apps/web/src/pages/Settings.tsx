@@ -2,21 +2,32 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SectionHeader } from '@/components/ui/section-header';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchJson } from '@/lib/api';
+import type { ConfigurationResponse, UpdateConfigurationInput } from '@/types/configuration';
 import type { CliStatus, CliToolStatus, CliToolsResponse } from '@/types/tool';
 import {
   AlertCircle,
   AlertTriangle,
-  Bot,
+  BrainCircuit,
   CheckCircle2,
-  Code2,
+  Container,
+  Gem,
   Github,
+  Mail,
+  Orbit,
   RefreshCw,
   Save,
-  Server,
+  Sparkles,
+  SquareTerminal,
   XCircle,
-  Zap,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -139,19 +150,74 @@ function StatusBadge({ status }: { status: CliStatus }) {
 
 // ─── CLI Tool Status Card ─────────────────────────────────────────────────────
 
-const CLI_INSTALL_HINTS: Record<string, string> = {
-  claude_code: 'npm install -g @anthropic-ai/claude-code',
-  codex: 'npm install -g @openai/codex',
-  gemini_cli: 'npm install -g @google/gemini-cli',
-  opencode: 'npm install -g opencode',
+const CLI_META: Record<
+  string,
+  {
+    authHint?: string;
+    description: string;
+    icon: React.ReactNode;
+    installHint?: string;
+    label: string;
+    sectionId: string;
+  }
+> = {
+  claude_code: {
+    authHint: 'claude login',
+    description: 'Anthropic CLI — claude',
+    icon: <BrainCircuit className="h-4 w-4" />,
+    installHint: 'npm install -g @anthropic-ai/claude-code',
+    label: 'claude_code',
+    sectionId: 'claude',
+  },
+  codex: {
+    authHint: 'codex login',
+    description: 'OpenAI CLI — codex',
+    icon: <SquareTerminal className="h-4 w-4" />,
+    installHint: 'npm install -g @openai/codex',
+    label: 'codex',
+    sectionId: 'codex',
+  },
+  kilo: {
+    authHint: 'open kilo auth and sign in with your Kilo account',
+    description: 'Kilo CLI — kilo',
+    icon: <Gem className="h-4 w-4" />,
+    installHint: 'npm install -g @kilocode/cli',
+    label: 'kilo',
+    sectionId: 'kilo',
+  },
+  gemini_cli: {
+    authHint: 'open gemini and choose "Login with Google"',
+    description: 'Google CLI — gemini',
+    icon: <Sparkles className="h-4 w-4" />,
+    installHint: 'npm install -g @google/gemini-cli',
+    label: 'gemini_cli',
+    sectionId: 'gemini',
+  },
+  opencode: {
+    authHint: 'opencode login',
+    description: 'OpenCode CLI — opencode',
+    icon: <Orbit className="h-4 w-4" />,
+    installHint: 'npm install -g opencode',
+    label: 'opencode',
+    sectionId: 'opencode',
+  },
 };
 
-const CLI_AUTH_HINTS: Record<string, string> = {
-  claude_code: 'claude login',
-  codex: 'codex login',
-  gemini_cli: 'export GEMINI_API_KEY=...  # or GOOGLE_API_KEY=...',
-  opencode: 'opencode login',
-};
+const CLI_TOOL_IDS = ['claude_code', 'codex', 'kilo', 'gemini_cli', 'opencode'] as const;
+
+const CLI_SECTIONS: Array<{
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+  toolId: string;
+}> = CLI_TOOL_IDS.map((toolId) => ({
+  id: CLI_META[toolId].sectionId,
+  label: CLI_META[toolId].label,
+  icon: CLI_META[toolId].icon,
+  description: CLI_META[toolId].description,
+  toolId,
+}));
 
 function CliStatusCard({ tool }: { tool: CliToolStatus }) {
   return (
@@ -173,10 +239,10 @@ function CliStatusCard({ tool }: { tool: CliToolStatus }) {
       {tool.status === 'not_installed' && (
         <div className="space-y-1 border border-destructive/30 bg-destructive/5 px-3 py-2.5">
           <p className="font-code text-destructive text-xs">{'> command not found in PATH'}</p>
-          {CLI_INSTALL_HINTS[tool.id] && (
+          {CLI_META[tool.id]?.installHint && (
             <p className="font-code text-2xs text-muted-foreground">
               {'$ '}
-              <span className="text-muted-foreground/80">{CLI_INSTALL_HINTS[tool.id]}</span>
+              <span className="text-muted-foreground/80">{CLI_META[tool.id].installHint}</span>
             </p>
           )}
         </div>
@@ -188,10 +254,15 @@ function CliStatusCard({ tool }: { tool: CliToolStatus }) {
           <p className="font-code text-xs text-yellow-500">
             {'> installed but authentication required'}
           </p>
-          {CLI_AUTH_HINTS[tool.id] && (
+          {CLI_META[tool.id]?.authHint && (
             <p className="font-code text-2xs text-muted-foreground">
               {'$ '}
-              <span className="text-muted-foreground/80">{CLI_AUTH_HINTS[tool.id]}</span>
+              <span className="text-muted-foreground/80">{CLI_META[tool.id].authHint}</span>
+            </p>
+          )}
+          {tool.id === 'gemini_cli' && (
+            <p className="font-code text-2xs text-muted-foreground/70">
+              {'> personal Google account / Google AI Ultra only; API keys are not used here'}
             </p>
           )}
         </div>
@@ -224,45 +295,6 @@ function CliStatusCard({ tool }: { tool: CliToolStatus }) {
     </div>
   );
 }
-
-// ─── CLI Tools Section ────────────────────────────────────────────────────────
-
-const CLI_SECTIONS: Array<{
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-  toolId: string;
-}> = [
-  {
-    id: 'claude',
-    label: 'claude_code',
-    icon: <Bot className="h-4 w-4" />,
-    description: 'Anthropic CLI — claude',
-    toolId: 'claude_code',
-  },
-  {
-    id: 'codex',
-    label: 'codex',
-    icon: <Code2 className="h-4 w-4" />,
-    description: 'OpenAI CLI — codex',
-    toolId: 'codex',
-  },
-  {
-    id: 'gemini',
-    label: 'gemini_cli',
-    icon: <Bot className="h-4 w-4" />,
-    description: 'Google CLI — gemini',
-    toolId: 'gemini_cli',
-  },
-  {
-    id: 'opencode',
-    label: 'open_code',
-    icon: <Zap className="h-4 w-4" />,
-    description: 'OpenCode CLI — opencode',
-    toolId: 'opencode',
-  },
-];
 
 function CliToolsSection() {
   const [tools, setTools] = useState<CliToolStatus[]>([]);
@@ -361,7 +393,7 @@ const SECTIONS: SettingsSection[] = [
   {
     id: 'dokku',
     label: 'dokku',
-    icon: <Server className="h-4 w-4" />,
+    icon: <Container className="h-4 w-4" />,
     description: 'Infrastructure deployment',
   },
   {
@@ -370,11 +402,20 @@ const SECTIONS: SettingsSection[] = [
     icon: <Github className="h-4 w-4" />,
     description: 'Repository management',
   },
+  {
+    id: 'email',
+    label: 'email',
+    icon: <Mail className="h-4 w-4" />,
+    description: 'Resend polling + transport',
+  },
 ];
 
 export default function Settings() {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [saveError, setSaveError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   // ── Dokku ──
   const [dokkuHost, setDokkuHost] = useState('');
@@ -388,11 +429,104 @@ export default function Settings() {
   const [ghClientSecret, setGhClientSecret] = useState('');
   const [ghPrivateKey, setGhPrivateKey] = useState('');
   const [ghClientSecretVisible, setGhClientSecretVisible] = useState(false);
+  const [ghClientSecretConfigured, setGhClientSecretConfigured] = useState(false);
+  const [ghPrivateKeyConfigured, setGhPrivateKeyConfigured] = useState(false);
+  const [ghClientSecretDirty, setGhClientSecretDirty] = useState(false);
+  const [ghPrivateKeyDirty, setGhPrivateKeyDirty] = useState(false);
 
-  const handleSave = () => {
-    // TODO: POST /api/configuration
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // ── Email ──
+  const [emailFromName, setEmailFromName] = useState('');
+  const [emailFromAddress, setEmailFromAddress] = useState('');
+  const [emailInboundAddress, setEmailInboundAddress] = useState('');
+  const [emailPollEnabled, setEmailPollEnabled] = useState('false');
+  const [emailPollInterval, setEmailPollInterval] = useState('60');
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [resendApiKeyConfigured, setResendApiKeyConfigured] = useState(false);
+  const [resendApiKeyDirty, setResendApiKeyDirty] = useState(false);
+
+  useEffect(() => {
+    const loadConfiguration = async () => {
+      setLoadingConfig(true);
+      setLoadError('');
+      try {
+        const config = await fetchJson<ConfigurationResponse>('/configuration');
+        setDokkuHost(config.dokku.host ?? '');
+        setDokkuUser(config.dokku.sshUser ?? 'dokku');
+        setDokkuPort(config.dokku.port ? String(config.dokku.port) : '22');
+
+        setGhAppId(config.github.appId ?? '');
+        setGhInstallationId(config.github.installationId ?? '');
+        setGhClientId(config.github.clientId ?? '');
+        setGhClientSecret('');
+        setGhPrivateKey('');
+        setGhClientSecretConfigured(config.github.clientSecret.configured);
+        setGhPrivateKeyConfigured(config.github.privateKey.configured);
+        setGhClientSecretDirty(false);
+        setGhPrivateKeyDirty(false);
+
+        setEmailFromName(config.email.fromName ?? '');
+        setEmailFromAddress(config.email.fromAddress ?? '');
+        setEmailInboundAddress(config.email.inboundAddress ?? '');
+        setEmailPollEnabled(String(config.email.pollEnabled));
+        setEmailPollInterval(String(config.email.pollIntervalSeconds ?? 60));
+        setResendApiKey('');
+        setResendApiKeyConfigured(config.email.resendApiKey.configured);
+        setResendApiKeyDirty(false);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : 'Unable to load configuration.');
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+
+    void loadConfiguration();
+  }, []);
+
+  const handleSave = async () => {
+    setSaveError('');
+    try {
+      const payload: UpdateConfigurationInput = {
+        dokku: {
+          host: dokkuHost.trim() || null,
+          port: dokkuPort.trim() ? Number(dokkuPort) : null,
+          sshUser: dokkuUser.trim() || null,
+        },
+        email: {
+          fromAddress: emailFromAddress.trim() || null,
+          fromName: emailFromName.trim() || null,
+          inboundAddress: emailInboundAddress.trim() || null,
+          pollEnabled: emailPollEnabled === 'true',
+          pollIntervalSeconds: Number(emailPollInterval || '60'),
+          ...(resendApiKeyDirty ? { resendApiKey } : {}),
+        },
+        github: {
+          appId: ghAppId.trim() || null,
+          clientId: ghClientId.trim() || null,
+          installationId: ghInstallationId.trim() || null,
+          ...(ghClientSecretDirty ? { clientSecret: ghClientSecret } : {}),
+          ...(ghPrivateKeyDirty ? { privateKey: ghPrivateKey } : {}),
+        },
+      };
+
+      const config = await fetchJson<ConfigurationResponse>('/configuration', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+
+      setGhClientSecret('');
+      setGhPrivateKey('');
+      setResendApiKey('');
+      setGhClientSecretConfigured(config.github.clientSecret.configured);
+      setGhPrivateKeyConfigured(config.github.privateKey.configured);
+      setResendApiKeyConfigured(config.email.resendApiKey.configured);
+      setGhClientSecretDirty(false);
+      setGhPrivateKeyDirty(false);
+      setResendApiKeyDirty(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Unable to save configuration.');
+    }
   };
 
   const scrollTo = (id: string) => {
@@ -403,10 +537,10 @@ export default function Settings() {
 
   const NAV_ITEMS = [
     ...SECTIONS,
-    { id: 'claude', label: 'claude_code' },
-    { id: 'codex', label: 'codex' },
-    { id: 'gemini', label: 'gemini_cli' },
-    { id: 'opencode', label: 'open_code' },
+    ...CLI_SECTIONS.map((section) => ({
+      id: section.id,
+      label: section.label,
+    })),
   ];
 
   return (
@@ -438,13 +572,20 @@ export default function Settings() {
         <Button
           size="sm"
           onClick={handleSave}
+          disabled={loadingConfig}
           className="mt-1 shrink-0"
           style={saved ? { boxShadow: '0 0 8px rgba(55,247,18,0.4)' } : undefined}
         >
           <Save className="mr-1.5 h-3 w-3" />
-          {saved ? 'saved' : 'save_all'}
+          {loadingConfig ? 'loading…' : saved ? 'saved' : 'save_all'}
         </Button>
       </div>
+
+      {(loadError || saveError) && (
+        <div className="border border-destructive/40 bg-destructive/5 px-4 py-3">
+          <p className="font-code text-destructive text-xs">{loadError || saveError}</p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* ── Jump nav (desktop) ──────────────────────────────────── */}
@@ -547,8 +688,11 @@ export default function Settings() {
                     id="gh-client-secret"
                     type={ghClientSecretVisible ? 'text' : 'password'}
                     value={ghClientSecret}
-                    onChange={(e) => setGhClientSecret(e.target.value)}
-                    placeholder="••••••••••••••••••••••••••••••••••••••••"
+                    onChange={(e) => {
+                      setGhClientSecretDirty(true);
+                      setGhClientSecret(e.target.value);
+                    }}
+                    placeholder={ghClientSecretConfigured ? 'configured' : 'not configured'}
                     className="pr-10 font-mono text-xs"
                   />
                   <button
@@ -570,14 +714,108 @@ export default function Settings() {
               <Textarea
                 id="gh-private-key"
                 value={ghPrivateKey}
-                onChange={(e) => setGhPrivateKey(e.target.value)}
-                placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
+                onChange={(e) => {
+                  setGhPrivateKeyDirty(true);
+                  setGhPrivateKey(e.target.value);
+                }}
+                placeholder={
+                  ghPrivateKeyConfigured
+                    ? 'configured - paste a new PEM to replace, or clear to remove'
+                    : '-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----'
+                }
                 className="min-h-[100px] resize-y font-mono text-xs"
               />
             </Field>
           </SectionCard>
 
-          {/* 03–05 · CLI Tools */}
+          <SectionCard section={SECTIONS[2]} active={activeSection === 'email'}>
+            <FieldGroup>
+              <Field id="email-poll-enabled" label="poll_enabled" hint="Enable inbound polling">
+                <Select value={emailPollEnabled} onValueChange={setEmailPollEnabled}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">true</SelectItem>
+                    <SelectItem value="false">false</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field id="email-from-name" label="from_name" hint="Display name for outbound emails">
+                <Input
+                  id="email-from-name"
+                  value={emailFromName}
+                  onChange={(e) => setEmailFromName(e.target.value)}
+                  placeholder="CEO"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field
+                id="email-from-address"
+                label="from_address"
+                hint="Sender address used by Resend"
+              >
+                <Input
+                  id="email-from-address"
+                  value={emailFromAddress}
+                  onChange={(e) => setEmailFromAddress(e.target.value)}
+                  placeholder="ceo@example.com"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field
+                id="email-inbound-address"
+                label="inbound_address"
+                hint="Inbound mailbox polled from Resend"
+              >
+                <Input
+                  id="email-inbound-address"
+                  value={emailInboundAddress}
+                  onChange={(e) => setEmailInboundAddress(e.target.value)}
+                  placeholder="ceo@inbound.resend.dev"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field
+                id="email-poll-interval"
+                label="poll_interval_seconds"
+                hint="Default 60 seconds"
+              >
+                <Input
+                  id="email-poll-interval"
+                  value={emailPollInterval}
+                  onChange={(e) => setEmailPollInterval(e.target.value)}
+                  placeholder="60"
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field
+                id="resend-api-key"
+                label="resend_api_key"
+                hint="Leave untouched to preserve existing key"
+                fullWidth
+              >
+                <Input
+                  id="resend-api-key"
+                  type="password"
+                  value={resendApiKey}
+                  onChange={(e) => {
+                    setResendApiKeyDirty(true);
+                    setResendApiKey(e.target.value);
+                  }}
+                  placeholder={resendApiKeyConfigured ? 'configured' : 're_...'}
+                  className="font-mono text-xs"
+                />
+              </Field>
+            </FieldGroup>
+            <div className="border border-border/50 bg-muted/30 px-3 py-2.5">
+              <p className="font-code text-2xs text-muted-foreground">
+                {'> polling uses the server process; no webhook is required in v1'}
+              </p>
+            </div>
+          </SectionCard>
+
+          {/* CLI Tools */}
           <CliToolsSection />
 
           {/* Bottom save bar */}
@@ -588,10 +826,11 @@ export default function Settings() {
             <Button
               size="sm"
               onClick={handleSave}
+              disabled={loadingConfig}
               style={saved ? { boxShadow: '0 0 8px rgba(55,247,18,0.4)' } : undefined}
             >
               <Save className="mr-1.5 h-3 w-3" />
-              {saved ? 'saved_!' : 'save_all'}
+              {loadingConfig ? 'loading…' : saved ? 'saved_!' : 'save_all'}
             </Button>
           </div>
         </div>

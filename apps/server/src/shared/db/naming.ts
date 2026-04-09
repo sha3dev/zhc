@@ -4,6 +4,7 @@ const REGISTERED_PREFIXES: Record<string, string> = {
   task: 'tsk',
   soul: 'sol',
   skill: 'skl',
+  email: 'eml',
   message: 'msg',
   queue: 'que',
   member: 'mbr',
@@ -13,6 +14,7 @@ const REGISTERED_PREFIXES: Record<string, string> = {
   notification: 'ntf',
   configuration: 'cfg',
   credential: 'crd',
+  execution: 'exe',
 };
 
 export function getTablePrefix(tableName: string): string {

@@ -1,6 +1,6 @@
 import { logger } from '../../../shared/observability/logger.js';
 import type { Agent } from '../domain/agent.js';
-import { getDefaultAgentsWithSouls } from '../domain/default-agents.js';
+import { getDefaultAgentsWithDefinitions } from '../domain/default-agents.js';
 import type { AgentsRepository, CreateAgentInput } from './contracts.js';
 
 export async function bootstrapDefaultAgents(repository: AgentsRepository): Promise<Agent[]> {
@@ -13,7 +13,7 @@ export async function bootstrapDefaultAgents(repository: AgentsRepository): Prom
 
   logger.info('Agents table is empty, seeding default agents from harness/subagents');
 
-  const definitions = getDefaultAgentsWithSouls();
+  const definitions = getDefaultAgentsWithDefinitions();
   const created: Agent[] = [];
 
   // Create CEO first (no parent)
@@ -26,11 +26,12 @@ export async function bootstrapDefaultAgents(repository: AgentsRepository): Prom
 
   const ceoInput: CreateAgentInput = {
     isCeo: true,
+    kind: 'ceo',
     key: ceoDefinition.key,
     modelCliId: null,
     model: null,
     name: ceoDefinition.name,
-    soul: ceoDefinition.soul,
+    subagentMd: ceoDefinition.subagentMd,
     status: 'not_ready',
   };
 
@@ -44,21 +45,22 @@ export async function bootstrapDefaultAgents(repository: AgentsRepository): Prom
   for (const definition of otherDefinitions) {
     const input: CreateAgentInput = {
       isCeo: definition.isCeo,
+      kind: definition.kind,
       key: definition.key,
       modelCliId: null,
       model: null,
       name: definition.name,
-      soul: definition.soul,
+      subagentMd: definition.subagentMd,
       status: 'not_ready',
     };
 
     const agent = await repository.create(input);
     created.push(agent);
     logger.info('Created default agent', {
-        id: agent.id,
-        name: agent.name,
-        status: agent.status,
-      });
+      id: agent.id,
+      name: agent.name,
+      status: agent.status,
+    });
   }
 
   logger.info('Default agents bootstrap complete', { total: created.length });

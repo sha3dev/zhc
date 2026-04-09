@@ -1,3 +1,4 @@
+import { AgentCeoBadge } from '@/components/agents/AgentCeoBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -10,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getAgentStatusLabel } from '@/lib/agents';
+import { getAgentStatusLabel, getAgentStatusVariant } from '@/lib/agents';
 import { fetchJson } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import type { AgentStats, AgentSummary } from '@/types/agent';
@@ -77,12 +78,6 @@ function ModelBar({ model, count, max }: { model: string; count: number; max: nu
   );
 }
 
-function statusVariant(s: string): 'success' | 'warning' | 'secondary' {
-  if (s === 'ready') return 'success';
-  if (s === 'not_ready') return 'warning';
-  return 'secondary';
-}
-
 const STAT_CONFIGS = [
   { key: 'total', label: 'total.agents', color: 'primary' as const },
   { key: 'ready', label: 'ready.agents', color: 'success' as const },
@@ -139,7 +134,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className="relative min-h-screen p-4 sm:p-6 space-y-6 sm:space-y-8"
+      className="relative min-h-full p-4 sm:p-6 space-y-6 sm:space-y-8"
       style={{
         backgroundImage:
           'repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(55,247,18,0.018) 28px, rgba(55,247,18,0.018) 29px)',
@@ -341,13 +336,18 @@ export default function Dashboard() {
                       style={{ animationDelay: `${i * 40}ms` }}
                     >
                       <TableCell>
-                        <span className="font-mono text-xs font-bold text-foreground">{`[::] ${agent.name}`}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {agent.isCeo && <AgentCeoBadge />}
+                          <span className="font-mono text-xs font-bold text-foreground">
+                            {agent.name}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="font-code text-xs text-muted-foreground hidden sm:table-cell">
                         {agent.model ?? <span className="opacity-40">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(agent.status)}>
+                        <Badge variant={getAgentStatusVariant(agent.status)}>
                           {getAgentStatusLabel(agent.status)}
                         </Badge>
                       </TableCell>

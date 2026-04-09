@@ -31,9 +31,9 @@ export default function AppShell() {
   }, [sidebarOpen]);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar — always visible ≥ md */}
-      <div className="hidden md:block shrink-0">
+      <div className="hidden shrink-0 md:block">
         <Sidebar />
       </div>
 
@@ -55,7 +55,7 @@ export default function AppShell() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2">
@@ -77,7 +77,10 @@ export default function AppShell() {
           </button>
         </header>
 
-        <main key={location.pathname} className="flex-1 min-w-0 overflow-auto animate-page-enter">
+        <main
+          key={location.pathname}
+          className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden animate-page-enter"
+        >
           <Outlet />
         </main>
       </div>

@@ -5,6 +5,7 @@ import {
   type AgentHierarchyNode,
   type AgentMemorySummary,
   type AgentStats,
+  agentKindSchema,
   agentModelCliIdSchema,
   agentModelSchema,
   agentStatusSchema,
@@ -58,6 +59,7 @@ function addModelSelectionValidation<
 
 const createAgentInputBaseSchema = z.object({
   isCeo: z.boolean().default(false),
+  kind: agentKindSchema.default('specialist'),
   key: z
     .string()
     .trim()
@@ -73,17 +75,50 @@ const createAgentInputBaseSchema = z.object({
     .min(1)
     .max(255)
     .regex(/^[a-zA-Z0-9\s\-_]+$/),
-  soul: z.string().trim().min(50).max(100000),
+  subagentMd: z.string().trim().min(50).max(100000),
   status: agentStatusSchema.default('not_ready'),
 });
 
-export const createAgentInputSchema = addModelSelectionValidation(createAgentInputBaseSchema);
+export const createAgentInputSchema = addModelSelectionValidation(
+  createAgentInputBaseSchema,
+).superRefine((value, context) => {
+  if (value.isCeo && value.kind !== 'ceo') {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'CEO agents must use kind=ceo',
+      path: ['kind'],
+    });
+  }
+
+  if (!value.isCeo && value.kind === 'ceo') {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Only the CEO can use kind=ceo',
+      path: ['kind'],
+    });
+  }
+
+  if (value.kind === 'expert' && (value.model !== null || value.modelCliId !== null)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Experts cannot define their own model selection',
+      path: value.model !== null ? ['model'] : ['modelCliId'],
+    });
+  }
+});
 
 export const updateAgentInputSchema = addModelSelectionValidation(
-  createAgentInputBaseSchema
-  .partial()
-  .omit({ isCeo: true, key: true })
+  createAgentInputBaseSchema.partial().omit({ isCeo: true, key: true }),
 )
+  .superRefine((value, context) => {
+    if (value.kind === 'expert' && (value.model !== null || value.modelCliId !== null)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Experts cannot define their own model selection',
+        path: value.model !== null ? ['model'] : ['modelCliId'],
+      });
+    }
+  })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided',
   });
@@ -98,13 +133,16 @@ export const listAgentsQuerySchema = z.object({
 
 export type CreateAgentInput = z.infer<typeof createAgentInputSchema>;
 export type UpdateAgentInput = z.infer<typeof updateAgentInputSchema>;
-export type ListAgentsQuery = z.infer<typeof listAgentsQuerySchema>;
+export type ListAgentsQuery = z.infer<typeof listAgentsQuerySchema> & {
+  kinds?: Array<z.infer<typeof agentKindSchema>>;
+};
 
 export interface AgentsRepository {
   archive(id: number): Promise<boolean>;
   count(): Promise<number>;
   create(input: CreateAgentInput): Promise<Agent>;
   findAll(query: ListAgentsQuery): Promise<{ agents: Agent[]; total: number }>;
+  findCeo(): Promise<Agent | null>;
   findById(id: number): Promise<Agent | null>;
   findByIdWithRelations(id: number): Promise<AgentDetails | null>;
   findForMemory(): Promise<AgentMemorySummary[]>;

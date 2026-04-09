@@ -1,15 +1,16 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AgentModel } from './agent.js';
+import type { AgentKind, AgentModel } from './agent.js';
 
 export interface DefaultAgentDefinition {
   description: string;
   isCeo: boolean;
+  kind: AgentKind;
   key: string;
   model: AgentModel | null;
   name: string;
-  soul: string;
+  subagentMd: string;
 }
 
 const subagentsDir = resolve(
@@ -66,10 +67,11 @@ function loadSubagents(): DefaultAgentDefinition[] {
     return {
       description: frontmatter.description,
       isCeo: frontmatter.name === 'CEO',
+      kind: frontmatter.name === 'CEO' ? 'ceo' : 'specialist',
       key: filename.replace(/\.md$/i, ''),
       model: frontmatter.model,
       name: frontmatter.name,
-      soul: body,
+      subagentMd: body,
     };
   });
 }
@@ -84,6 +86,6 @@ export const defaultAgentNames = [
   'DevOps Engineer',
 ];
 
-export function getDefaultAgentsWithSouls(): DefaultAgentDefinition[] {
+export function getDefaultAgentsWithDefinitions(): DefaultAgentDefinition[] {
   return loadSubagents();
 }

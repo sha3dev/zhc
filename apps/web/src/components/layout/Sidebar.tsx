@@ -5,7 +5,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'dashboard', index: '01' },
   { to: '/agents', label: 'agents', index: '02' },
-  { to: '/settings', label: 'settings', index: '03' },
+  { to: '/experts', label: 'experts', index: '03' },
+  { to: '/executions', label: 'executions', index: '04' },
+  { to: '/mails', label: 'mails', index: '05' },
+  { to: '/settings', label: 'settings', index: '06' },
 ];
 
 export default function Sidebar() {
@@ -31,12 +34,15 @@ export default function Sidebar() {
   }, []);
 
   const isActive = (path: string) =>
-    location.pathname === path || (path === '/agents' && location.pathname.startsWith('/agents/'));
+    location.pathname === path ||
+    (path === '/agents' && location.pathname.startsWith('/agents/')) ||
+    (path === '/experts' && location.pathname.startsWith('/experts/')) ||
+    (path === '/executions' && location.pathname.startsWith('/executions/'));
 
   return (
     <aside
       className={cn(
-        'relative flex flex-col justify-between shrink-0 min-h-screen',
+        'relative flex h-screen flex-col justify-between overflow-hidden shrink-0',
         'w-[220px] border-r border-border bg-card',
       )}
     >

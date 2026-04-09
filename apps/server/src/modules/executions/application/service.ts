@@ -1,19 +1,37 @@
 import { cwd } from 'node:process';
 import type { ZodError, ZodType } from 'zod';
-import { InfrastructureError, ValidationError } from '../../../shared/errors/app-error.js';
-import type { ExecutionRequest, ExecutionResult } from '../domain/execution.js';
-import { EXECUTION_OPERATIONS } from './operations.js';
-import { composePromptBlocks, serializePromptBlocks } from './prompt-composer.js';
+import {
+  InfrastructureError,
+  NotFoundError,
+  ValidationError,
+} from '../../../shared/errors/app-error.js';
+import type { ExecutionDetails, ExecutionRequest, ExecutionResult } from '../domain/execution.js';
 import type {
   AgentLookup,
+  ExecutionRepositoryLookup,
   MemoryProvider,
   ModelRunner,
   PromptRegistry,
   ToolStatusLookup,
 } from './contracts.js';
+import type { ListExecutionsQuery } from './execution-contracts.js';
+import { EXECUTION_OPERATIONS } from './operations.js';
+import { composePromptBlocks, serializePromptBlocks } from './prompt-composer.js';
 
 function zodErrorToMessage(error: ZodError): string {
-  return error.issues.map((issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`).join('; ');
+  return error.issues
+    .map((issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`)
+    .join('; ');
+}
+
+function createStaticPromptBlock(fragment: { content: string; key: string }) {
+  return {
+    content: fragment.content.trim(),
+    key: fragment.key,
+    kind: 'static' as const,
+    source: 'static' as const,
+    title: fragment.key === 'general-rules' ? 'General Rules' : `Static Memory: ${fragment.key}`,
+  };
 }
 
 export class ExecutionsService {
@@ -22,6 +40,7 @@ export class ExecutionsService {
     private readonly tools: ToolStatusLookup,
     private readonly prompts: PromptRegistry,
     private readonly memory: MemoryProvider,
+    private readonly repository: ExecutionRepositoryLookup,
     private readonly runners: ModelRunner[],
   ) {}
 
@@ -65,6 +84,7 @@ export class ExecutionsService {
 
     const operation = EXECUTION_OPERATIONS[input.operationKey];
     const promptAsset = await this.prompts.get(input.operationKey);
+    const generalRulesFragment = await this.prompts.getFragment('general-rules');
     const memoryBlocks = await this.memory.build(
       {
         agent,
@@ -74,25 +94,23 @@ export class ExecutionsService {
       },
       operation?.memoryKeys ?? [],
     );
-    const staticBlocks = await Promise.all(
-      (operation?.staticFragments ?? []).map(async (fragmentKey) => {
-        const fragment = await this.prompts.getFragment(fragmentKey);
-        return {
-          content: fragment.content.trim(),
-          key: fragment.key,
-          kind: 'static' as const,
-          source: 'static' as const,
-          title: `Static Memory: ${fragment.key}`,
-        };
-      }),
-    );
+    const staticBlocks = [
+      createStaticPromptBlock(generalRulesFragment),
+      ...(await Promise.all(
+        (operation?.staticFragments ?? []).map(async (fragmentKey) =>
+          createStaticPromptBlock(await this.prompts.getFragment(fragmentKey)),
+        ),
+      )),
+    ];
 
     const missingMemoryKeys = (operation?.memoryKeys ?? []).filter(
       (memoryKey) => !memoryBlocks.some((block) => block.key === memoryKey),
     );
 
     if (missingMemoryKeys.length > 0) {
-      throw new InfrastructureError(`Missing required memory blocks: ${missingMemoryKeys.join(', ')}`);
+      throw new InfrastructureError(
+        `Missing required memory blocks: ${missingMemoryKeys.join(', ')}`,
+      );
     }
 
     const promptBlocks = composePromptBlocks({
@@ -100,17 +118,19 @@ export class ExecutionsService {
       context: input.context,
       memoryBlocks: [...staticBlocks, ...memoryBlocks],
       operationKey: input.operationKey,
-      soul: agent.soul,
+      subagentMd: agent.subagentMd,
       userInput: input.userInput,
     });
     const composedPrompt = serializePromptBlocks(promptBlocks);
 
+    const sandboxMode = input.sandboxMode ?? 'read-only';
+    const workingDirectory = input.workingDirectory ?? cwd();
     const raw = await runner.run({
       cliId: availableTool.id,
       model: agent.model,
       prompt: composedPrompt,
-      sandboxMode: input.sandboxMode ?? 'read-only',
-      workingDirectory: input.workingDirectory ?? cwd(),
+      sandboxMode,
+      workingDirectory,
     });
 
     const schema = this.resolveSchema(input.operationKey, input.outputSchema);
@@ -126,19 +146,58 @@ export class ExecutionsService {
       }
     }
 
+    const persisted = await this.repository.create({
+      agentId: agent.id,
+      cliId: availableTool.id,
+      composedPrompt,
+      context: input.context ?? null,
+      durationMs: Date.now() - startedAt,
+      executedAt: new Date(),
+      model: agent.model,
+      operationKey: input.operationKey,
+      parsedOutput,
+      promptBlocks,
+      promptPath: promptAsset.path,
+      rawOutput: raw.rawOutput,
+      sandboxMode,
+      userInput: input.userInput,
+      validationError,
+      workingDirectory,
+    });
+
     return {
+      agentId: agent.id,
       composedPrompt,
       cliId: availableTool.id,
-      durationMs: Date.now() - startedAt,
-      executedAt: new Date().toISOString(),
+      context: input.context,
+      durationMs: persisted.durationMs,
+      executedAt: persisted.executedAt.toISOString(),
+      id: persisted.id,
       model: agent.model,
       promptBlocks,
       operationKey: input.operationKey,
       parsedOutput,
       promptPath: promptAsset.path,
       rawOutput: raw.rawOutput,
+      sandboxMode,
+      userInput: input.userInput,
       validationError,
+      workingDirectory,
     };
+  }
+
+  async getById(id: number): Promise<ExecutionDetails> {
+    const execution = await this.repository.findById(id);
+
+    if (!execution) {
+      throw new NotFoundError(`Execution ${id} not found`);
+    }
+
+    return execution;
+  }
+
+  list(query: ListExecutionsQuery) {
+    return this.repository.list(query);
   }
 
   private resolveSchema<TParsed>(
