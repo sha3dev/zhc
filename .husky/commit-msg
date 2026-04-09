@@ -1,2 +1,2 @@
 . "$(dirname -- "$0")/common.sh"
-npx commitlint --edit $1
+npm exec commitlint -- --edit "$1"

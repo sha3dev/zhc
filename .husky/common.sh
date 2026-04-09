@@ -4,6 +4,11 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   . "$NVM_DIR/nvm.sh"
 fi
 
+# Prefer the repo-declared Node version when available
+if command -v nvm >/dev/null 2>&1 && [ -f ".nvmrc" ]; then
+  nvm use --silent >/dev/null 2>&1 || true
+fi
+
 # Try to find node in common locations and add to PATH
 if [ -d "$HOME/.nvm" ]; then
   # Add nvm to PATH
