@@ -14,34 +14,62 @@ export class SqlTasksRepository implements TasksRepository {
 
   private readonly columns = {
     assignedToAgentId: 'agn_id',
+    assignedToExpertId: 'exp_id',
     createdAt: getTimestampColumn(this.tableName, 'created_at'),
     description: getColumnName(this.tableName, 'description'),
+    hasDependencyRisk: getColumnName(this.tableName, 'has_dependency_risk'),
     id: getPrimaryKeyColumn(this.tableName),
+    lastExecutionId: 'exe_id',
     projectId: 'prj_id',
+    completedAt: getColumnName(this.tableName, 'completed_at'),
+    reopenCount: getColumnName(this.tableName, 'reopen_count'),
+    reopenedAt: getColumnName(this.tableName, 'reopened_at'),
+    reopenedFromTaskEventId: getColumnName(this.tableName, 'reopened_from_tev_id'),
+    reviewCycle: getColumnName(this.tableName, 'review_cycle'),
     sort: getColumnName(this.tableName, 'sort'),
     status: getColumnName(this.tableName, 'status'),
     title: getColumnName(this.tableName, 'title'),
     updatedAt: getTimestampColumn(this.tableName, 'updated_at'),
   };
 
+  private async resolveActorColumns(
+    actorId: number,
+  ): Promise<{ agentId: number | null; expertId: number | null }> {
+    const result = await query<{ agn_id: number | null; exp_id: number | null }>(
+      `
+        SELECT
+          (SELECT agn_id FROM agent WHERE agn_id = $1) AS agn_id,
+          (SELECT exp_id FROM expert WHERE exp_id = $1) AS exp_id
+      `,
+      [actorId],
+    );
+
+    return {
+      agentId: result.rows[0]?.agn_id ?? null,
+      expertId: result.rows[0]?.exp_id ?? null,
+    };
+  }
+
   async assign(taskId: number, agentId: number): Promise<Task | null> {
-    const result = await query<TaskRecord>(
+    const actor = await this.resolveActorColumns(agentId);
+    const result = await query<{ tsk_id: number }>(
       `
         UPDATE ${this.tableName}
         SET ${this.columns.assignedToAgentId} = $1,
+            ${this.columns.assignedToExpertId} = $2,
             ${this.columns.status} = 'assigned',
             ${this.columns.updatedAt} = CURRENT_TIMESTAMP
-        WHERE ${this.columns.id} = $2
-        RETURNING *
+        WHERE ${this.columns.id} = $3
+        RETURNING ${this.columns.id}
       `,
-      [agentId, taskId],
+      [actor.agentId, actor.expertId, taskId],
     );
 
     if (!result.rows[0]) {
       return null;
     }
 
-    return this.hydrate(result.rows[0]);
+    return this.findById(result.rows[0].tsk_id);
   }
 
   async canStart(taskId: number): Promise<boolean> {
@@ -65,24 +93,31 @@ export class SqlTasksRepository implements TasksRepository {
   }
 
   async create(input: CreateTaskInput): Promise<Task> {
-    const result = await query<TaskRecord>(
+    const actor = input.assignedToAgentId
+      ? await this.resolveActorColumns(input.assignedToAgentId)
+      : { agentId: null, expertId: null };
+    const initialStatus = input.assignedToAgentId ? 'assigned' : 'pending';
+    const result = await query<{ tsk_id: number }>(
       `
         INSERT INTO ${this.tableName} (
           ${this.columns.projectId},
           ${this.columns.assignedToAgentId},
+          ${this.columns.assignedToExpertId},
           ${this.columns.title},
           ${this.columns.description},
           ${this.columns.sort},
           ${this.columns.status}
-        ) VALUES ($1, $2, $3, $4, $5, 'pending')
-        RETURNING *
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING ${this.columns.id}
       `,
       [
         input.projectId,
-        input.assignedToAgentId ?? null,
+        actor.agentId,
+        actor.expertId,
         input.title,
         input.description,
         input.sort,
+        initialStatus,
       ],
     );
 
@@ -92,7 +127,7 @@ export class SqlTasksRepository implements TasksRepository {
       await this.replaceDependencies(task.tsk_id, input.dependsOnTaskIds);
     }
 
-    return this.hydrate(task);
+    return (await this.findById(task.tsk_id))!;
   }
 
   async findAll(filters: ListTasksQuery): Promise<{ tasks: Task[]; total: number }> {
@@ -101,33 +136,42 @@ export class SqlTasksRepository implements TasksRepository {
     let index = 1;
 
     if (filters.projectId) {
-      clauses.push(`${this.columns.projectId} = $${index++}`);
+      clauses.push(`task.${this.columns.projectId} = $${index++}`);
       params.push(filters.projectId);
     }
 
     if (filters.status) {
-      clauses.push(`${this.columns.status} = $${index++}`);
+      clauses.push(`task.${this.columns.status} = $${index++}`);
       params.push(filters.status);
     }
 
     if (filters.assignedToAgentId) {
-      clauses.push(`${this.columns.assignedToAgentId} = $${index++}`);
+      clauses.push(
+        `(task.${this.columns.assignedToAgentId} = $${index++} OR task.${this.columns.assignedToExpertId} = $${index++})`,
+      );
+      params.push(filters.assignedToAgentId);
       params.push(filters.assignedToAgentId);
     }
 
     const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
 
     const countResult = await query<{ total: string }>(
-      `SELECT COUNT(*)::text AS total FROM ${this.tableName} ${whereClause}`,
+      `SELECT COUNT(*)::text AS total FROM ${this.tableName} task ${whereClause}`,
       params,
     );
 
     const dataResult = await query<TaskRecord>(
       `
-        SELECT *
-        FROM ${this.tableName}
+        SELECT task.*,
+               COALESCE(agent.agn_id, expert.exp_id) AS actor_id,
+               COALESCE(agent.agn_name, expert.exp_name) AS agent_name
+        FROM ${this.tableName} task
+        LEFT JOIN agent
+          ON task.${this.columns.assignedToAgentId} = agent.agn_id
+        LEFT JOIN expert
+          ON task.${this.columns.assignedToExpertId} = expert.exp_id
         ${whereClause}
-        ORDER BY ${this.columns.sort} ASC, ${this.columns.createdAt} ASC
+        ORDER BY task.${this.columns.sort} ASC, task.${this.columns.createdAt} ASC
         LIMIT $${index++}
         OFFSET $${index++}
       `,
@@ -142,9 +186,48 @@ export class SqlTasksRepository implements TasksRepository {
     };
   }
 
+  async findDependents(taskId: number): Promise<Task[]> {
+    const result = await query<TaskRecord>(
+      `
+        WITH RECURSIVE dependent_tree AS (
+          SELECT dependency.tsk_id
+          FROM ${this.dependencyTableName} dependency
+          WHERE dependency.depends_on_tsk_id = $1
+          UNION
+          SELECT dependency.tsk_id
+          FROM ${this.dependencyTableName} dependency
+          JOIN dependent_tree tree ON tree.tsk_id = dependency.depends_on_tsk_id
+        )
+        SELECT DISTINCT task.*,
+               COALESCE(agent.agn_id, expert.exp_id) AS actor_id,
+               COALESCE(agent.agn_name, expert.exp_name) AS agent_name
+        FROM dependent_tree
+        JOIN ${this.tableName} task ON task.${this.columns.id} = dependent_tree.tsk_id
+        LEFT JOIN agent
+          ON task.${this.columns.assignedToAgentId} = agent.agn_id
+        LEFT JOIN expert
+          ON task.${this.columns.assignedToExpertId} = expert.exp_id
+        ORDER BY task.${this.columns.sort} ASC, task.${this.columns.createdAt} ASC
+      `,
+      [taskId],
+    );
+
+    return Promise.all(result.rows.map((row) => this.hydrate(row)));
+  }
+
   async findById(id: number): Promise<Task | null> {
     const result = await query<TaskRecord>(
-      `SELECT * FROM ${this.tableName} WHERE ${this.columns.id} = $1`,
+      `
+        SELECT task.*,
+               COALESCE(agent.agn_id, expert.exp_id) AS actor_id,
+               COALESCE(agent.agn_name, expert.exp_name) AS agent_name
+        FROM ${this.tableName} task
+        LEFT JOIN agent
+          ON task.${this.columns.assignedToAgentId} = agent.agn_id
+        LEFT JOIN expert
+          ON task.${this.columns.assignedToExpertId} = expert.exp_id
+        WHERE task.${this.columns.id} = $1
+      `,
       [id],
     );
 
@@ -158,10 +241,16 @@ export class SqlTasksRepository implements TasksRepository {
   async findByProjectId(projectId: number): Promise<Task[]> {
     const result = await query<TaskRecord>(
       `
-        SELECT *
-        FROM ${this.tableName}
-        WHERE ${this.columns.projectId} = $1
-        ORDER BY ${this.columns.sort} ASC, ${this.columns.createdAt} ASC
+        SELECT task.*,
+               COALESCE(agent.agn_id, expert.exp_id) AS actor_id,
+               COALESCE(agent.agn_name, expert.exp_name) AS agent_name
+        FROM ${this.tableName} task
+        LEFT JOIN agent
+          ON task.${this.columns.assignedToAgentId} = agent.agn_id
+        LEFT JOIN expert
+          ON task.${this.columns.assignedToExpertId} = expert.exp_id
+        WHERE task.${this.columns.projectId} = $1
+        ORDER BY task.${this.columns.sort} ASC, task.${this.columns.createdAt} ASC
       `,
       [projectId],
     );
@@ -172,8 +261,14 @@ export class SqlTasksRepository implements TasksRepository {
   async getNextPendingTasks(projectId: number): Promise<Task[]> {
     const result = await query<TaskRecord>(
       `
-        SELECT task.*
+        SELECT task.*,
+               COALESCE(agent.agn_id, expert.exp_id) AS actor_id,
+               COALESCE(agent.agn_name, expert.exp_name) AS agent_name
         FROM ${this.tableName} task
+        LEFT JOIN agent
+          ON task.${this.columns.assignedToAgentId} = agent.agn_id
+        LEFT JOIN expert
+          ON task.${this.columns.assignedToExpertId} = expert.exp_id
         WHERE task.${this.columns.projectId} = $1
           AND task.${this.columns.status} = 'pending'
           AND NOT EXISTS (
@@ -193,22 +288,102 @@ export class SqlTasksRepository implements TasksRepository {
   }
 
   async updateStatus(taskId: number, status: Task['status']): Promise<Task | null> {
-    const result = await query<TaskRecord>(
+    return this.update(taskId, { status });
+  }
+
+  async setDependencyRisk(taskIds: number[], hasDependencyRisk: boolean): Promise<void> {
+    if (taskIds.length === 0) {
+      return;
+    }
+
+    await query(
       `
         UPDATE ${this.tableName}
-        SET ${this.columns.status} = $1,
+        SET ${this.columns.hasDependencyRisk} = $1,
             ${this.columns.updatedAt} = CURRENT_TIMESTAMP
-        WHERE ${this.columns.id} = $2
-        RETURNING *
+        WHERE ${this.columns.id} = ANY($2)
       `,
-      [status, taskId],
+      [hasDependencyRisk, taskIds],
+    );
+  }
+
+  async update(
+    taskId: number,
+    input: {
+      completedAt?: Date | null;
+      hasDependencyRisk?: boolean;
+      lastExecutionId?: number | null;
+      reopenedAt?: Date | null;
+      reopenedFromTaskEventId?: number | null;
+      reopenCount?: number;
+      reviewCycle?: number;
+      status?: Task['status'];
+    },
+  ): Promise<Task | null> {
+    const updates: string[] = [];
+    const params: Array<Date | boolean | number | string | null> = [];
+    let index = 1;
+
+    if (input.status !== undefined) {
+      updates.push(`${this.columns.status} = $${index++}`);
+      params.push(input.status);
+    }
+
+    if (input.reviewCycle !== undefined) {
+      updates.push(`${this.columns.reviewCycle} = $${index++}`);
+      params.push(input.reviewCycle);
+    }
+
+    if (input.reopenCount !== undefined) {
+      updates.push(`${this.columns.reopenCount} = $${index++}`);
+      params.push(input.reopenCount);
+    }
+
+    if (input.reopenedAt !== undefined) {
+      updates.push(`${this.columns.reopenedAt} = $${index++}`);
+      params.push(input.reopenedAt);
+    }
+
+    if (input.completedAt !== undefined) {
+      updates.push(`${this.columns.completedAt} = $${index++}`);
+      params.push(input.completedAt);
+    }
+
+    if (input.reopenedFromTaskEventId !== undefined) {
+      updates.push(`${this.columns.reopenedFromTaskEventId} = $${index++}`);
+      params.push(input.reopenedFromTaskEventId);
+    }
+
+    if (input.hasDependencyRisk !== undefined) {
+      updates.push(`${this.columns.hasDependencyRisk} = $${index++}`);
+      params.push(input.hasDependencyRisk);
+    }
+
+    if (input.lastExecutionId !== undefined) {
+      updates.push(`${this.columns.lastExecutionId} = $${index++}`);
+      params.push(input.lastExecutionId);
+    }
+
+    if (updates.length === 0) {
+      return this.findById(taskId);
+    }
+
+    const result = await query<{ tsk_id: number }>(
+      `
+        UPDATE ${this.tableName}
+        SET ${updates.join(', ')},
+            ${this.columns.updatedAt} = CURRENT_TIMESTAMP
+        WHERE ${this.columns.id} = $${index}
+        RETURNING ${this.columns.id}
+      `,
+      [...params, taskId],
     );
 
     if (!result.rows[0]) {
       return null;
     }
 
-    return this.hydrate(result.rows[0]);
+    return this.findById(result.rows[0].tsk_id);
   }
 
   private async getDependencies(taskId: number): Promise<number[]> {

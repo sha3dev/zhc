@@ -1,6 +1,7 @@
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import RuntimeWorkIndicator from './RuntimeWorkIndicator';
 import Sidebar from './Sidebar';
 
 export default function AppShell() {
@@ -43,12 +44,12 @@ export default function AppShell() {
           {/* Backdrop */}
           <button
             type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+            className="absolute inset-0 animate-fade-in bg-black/60 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close navigation"
           />
           {/* Drawer */}
-          <div className="absolute left-0 top-0 bottom-0 z-50 animate-page-enter">
+          <div className="absolute top-0 bottom-0 left-0 z-50 animate-page-enter">
             <Sidebar />
           </div>
         </div>
@@ -57,29 +58,31 @@ export default function AppShell() {
       {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
+        <header className="flex shrink-0 items-center justify-between border-border border-b bg-card px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
             <span
-              className="font-mono text-xs font-bold text-primary"
+              className="font-bold font-mono text-primary text-xs"
               style={{ textShadow: 'var(--glow-primary-sm)' }}
             >
               agent_orchestrator
             </span>
-            <span className="font-mono text-xs text-primary animate-cursor-blink">_</span>
+            <span className="animate-cursor-blink font-mono text-primary text-xs">_</span>
           </div>
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="border border-border p-1.5 text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors duration-150 active:scale-95"
+            className="border border-border p-1.5 text-muted-foreground transition-colors duration-150 hover:border-foreground/40 hover:text-foreground active:scale-95"
             aria-label="Toggle navigation"
           >
             {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </header>
 
+        <RuntimeWorkIndicator />
+
         <main
           key={location.pathname}
-          className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden animate-page-enter"
+          className="min-w-0 flex-1 animate-page-enter overflow-y-auto overflow-x-hidden"
         >
           <Outlet />
         </main>

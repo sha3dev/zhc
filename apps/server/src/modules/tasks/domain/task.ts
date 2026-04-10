@@ -4,6 +4,9 @@ export const taskStatuses = [
   'pending',
   'assigned',
   'in_progress',
+  'awaiting_review',
+  'changes_requested',
+  'reopened',
   'completed',
   'failed',
   'blocked',
@@ -15,23 +18,41 @@ export type TaskStatus = z.infer<typeof taskStatusSchema>;
 
 export interface Task {
   assignedToAgentId: number | null;
+  assignedToAgentName: string | null;
+  canRun: boolean;
   createdAt: Date;
   dependsOnTaskIds: number[];
   description: string;
+  hasDependencyRisk: boolean;
   id: number;
+  lastExecutionId: number | null;
   projectId: number;
+  reopenCount: number;
+  reopenedAt: Date | null;
+  reopenedFromTaskEventId: number | null;
+  reviewCycle: number;
+  runBlockedReason: string | null;
   sort: number;
   status: TaskStatus;
   title: string;
+  completedAt: Date | null;
   updatedAt: Date;
 }
 
 export interface TaskRecord {
-  agn_id: number | null;
+  actor_id: number | null;
+  agent_name?: string | null;
+  exe_id: number | null;
   prj_id: number;
+  tsk_completed_at: Date | null;
   tsk_created_at: Date;
   tsk_description: string;
+  tsk_has_dependency_risk: boolean;
   tsk_id: number;
+  tsk_reopen_count: number;
+  tsk_reopened_at: Date | null;
+  tsk_reopened_from_tev_id: number | null;
+  tsk_review_cycle: number;
   tsk_sort: number;
   tsk_status: TaskStatus;
   tsk_title: string;

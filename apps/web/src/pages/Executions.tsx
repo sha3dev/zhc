@@ -104,7 +104,7 @@ export default function Executions() {
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <SectionHeader label="EXECUTIONS" />
-          <h1 className="font-mono text-xl font-bold text-foreground sm:text-3xl">
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-3xl">
             executions
             <span
               className="ml-1 animate-cursor-blink text-primary"
@@ -113,7 +113,7 @@ export default function Executions() {
               |
             </span>
           </h1>
-          <p className="hidden font-code text-xs text-muted-foreground sm:block">
+          <p className="hidden font-code text-muted-foreground text-xs sm:block">
             agent_orchestrator :: execution log index
           </p>
         </div>
@@ -126,7 +126,7 @@ export default function Executions() {
 
       {error && (
         <div className="border border-border bg-card px-4 py-3">
-          <p className="font-code text-xs text-destructive">{`> error: ${error}`}</p>
+          <p className="font-code text-destructive text-xs">{`> error: ${error}`}</p>
         </div>
       )}
 
@@ -209,7 +209,7 @@ export default function Executions() {
           </div>
 
           <div className="relative lg:col-span-4">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="-translate-y-1/2 absolute top-1/2 left-3 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}
@@ -243,7 +243,7 @@ export default function Executions() {
           ))
         ) : executions.length === 0 ? (
           <div className="border border-border bg-card px-6 py-16 text-center">
-            <p className="font-code text-xs text-muted-foreground">{'> no executions found'}</p>
+            <p className="font-code text-muted-foreground text-xs">{'> no executions found'}</p>
           </div>
         ) : (
           executions.map((execution, index) => (
@@ -251,49 +251,35 @@ export default function Executions() {
               key={execution.id}
               type="button"
               onClick={() => navigate(`/executions/${execution.id}`)}
-              className="block w-full border border-border bg-card p-5 text-left transition-colors duration-150 hover:border-primary/40 hover:bg-primary/5"
+              className="block w-full border border-border bg-card px-4 py-3 text-left transition-colors duration-150 hover:border-primary/40 hover:bg-primary/5"
               style={{ animationDelay: `${index * 30}ms` }}
             >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Badge>{execution.operationKey}</Badge>
                     <Badge variant="secondary">{execution.cliId}</Badge>
                     <Badge variant="outline">{execution.model}</Badge>
                   </div>
-                  <div className="space-y-2">
-                    <h2 className="font-mono text-sm font-bold text-foreground sm:text-base">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <h2 className="font-bold font-mono text-foreground text-sm">
                       {execution.agentName}
                     </h2>
-                    <div className="grid gap-2 text-left sm:grid-cols-2 xl:grid-cols-4">
-                      <div>
-                        <p className="mono-label">executed_at</p>
-                        <p className="mt-1 font-code text-xs text-muted-foreground">
-                          {formatDate(execution.executedAt)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="mono-label">duration</p>
-                        <p className="mt-1 font-code text-xs text-muted-foreground">
-                          {formatDuration(execution.durationMs)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="mono-label">agent_id</p>
-                        <p className="mt-1 font-code text-xs text-muted-foreground">
-                          {execution.agentId}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="mono-label">execution_id</p>
-                        <p className="mt-1 font-code text-xs text-muted-foreground">
-                          {execution.id}
-                        </p>
-                      </div>
-                    </div>
+                    <span className="font-code text-2xs text-muted-foreground">
+                      {formatDate(execution.executedAt)}
+                    </span>
+                    <span className="font-code text-2xs text-muted-foreground">
+                      {formatDuration(execution.durationMs)}
+                    </span>
+                    <span className="font-code text-2xs text-muted-foreground">
+                      agent #{execution.agentId}
+                    </span>
+                    <span className="font-code text-2xs text-muted-foreground">
+                      execution #{execution.id}
+                    </span>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 font-code text-2xs uppercase tracking-widest text-primary">
+                <span className="inline-flex shrink-0 items-center gap-1 self-center font-code text-2xs text-primary uppercase tracking-widest">
                   open detail
                   <ArrowRight className="h-3 w-3" />
                 </span>

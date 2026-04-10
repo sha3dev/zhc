@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { idParamSchema, parseJson, parseParams, parseQuery } from '../../../shared/http/parse.js';
-import { listAgentsQuerySchema } from '../application/contracts.js';
+import { listExpertsQuerySchema } from '../application/experts-contracts.js';
 import type { ExpertsService } from '../application/experts-service.js';
 
 const createExpertInputSchema = z.object({
@@ -37,10 +37,10 @@ export function createExpertsRouter(service: ExpertsService): Hono {
   const router = new Hono();
 
   router.get('/', async (context) => {
-    const query = parseQuery(context, listAgentsQuerySchema);
+    const query = parseQuery(context, listExpertsQuerySchema);
     const result = await service.list(query);
     return context.json({
-      items: result.agents,
+      items: result.experts,
       limit: query.limit,
       offset: query.offset,
       total: result.total,

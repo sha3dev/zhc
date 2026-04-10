@@ -37,7 +37,6 @@ describe('AgentsService', () => {
     const result = await service.list({ limit: 20, offset: 0 });
 
     expect(repository.findAll).toHaveBeenCalledWith({
-      kinds: ['ceo', 'specialist'],
       limit: 20,
       offset: 0,
     });

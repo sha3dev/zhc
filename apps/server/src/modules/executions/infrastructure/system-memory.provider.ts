@@ -1,12 +1,12 @@
-import type { AgentMemorySummary } from '../../agents/domain/agent.js';
+import type { RegistryEntityMemorySummary } from '../../agents/domain/expert.js';
 import type { MemoryBuildInput, MemoryProvider } from '../application/contracts.js';
 import type { MemoryBlock } from '../domain/execution.js';
 
 interface AgentMemoryReader {
-  listForMemory(): Promise<AgentMemorySummary[]>;
+  listForMemory(): Promise<RegistryEntityMemorySummary[]>;
 }
 
-function serializeAvailableAgents(agents: AgentMemorySummary[]): string {
+function serializeAvailableAgents(agents: RegistryEntityMemorySummary[]): string {
   return JSON.stringify(
     agents.map((agent) => ({
       id: agent.id,

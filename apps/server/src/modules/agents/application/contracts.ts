@@ -97,31 +97,13 @@ export const createAgentInputSchema = addModelSelectionValidation(
       path: ['kind'],
     });
   }
-
-  if (value.kind === 'expert' && (value.model !== null || value.modelCliId !== null)) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Experts cannot define their own model selection',
-      path: value.model !== null ? ['model'] : ['modelCliId'],
-    });
-  }
 });
 
 export const updateAgentInputSchema = addModelSelectionValidation(
   createAgentInputBaseSchema.partial().omit({ isCeo: true, key: true }),
-)
-  .superRefine((value, context) => {
-    if (value.kind === 'expert' && (value.model !== null || value.modelCliId !== null)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Experts cannot define their own model selection',
-        path: value.model !== null ? ['model'] : ['modelCliId'],
-      });
-    }
-  })
-  .refine((value) => Object.keys(value).length > 0, {
-    message: 'At least one field must be provided',
-  });
+).refine((value) => Object.keys(value).length > 0, {
+  message: 'At least one field must be provided',
+});
 
 export const listAgentsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),

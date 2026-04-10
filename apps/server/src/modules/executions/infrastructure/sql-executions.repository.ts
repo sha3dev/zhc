@@ -20,6 +20,7 @@ export class SqlExecutionsRepository implements ExecutionsRepository {
 
   private readonly columns = {
     agentId: 'agn_id',
+    expertId: 'exp_id',
     cliId: getColumnName(this.tableName, 'cli_id'),
     composedPrompt: getColumnName(this.tableName, 'composed_prompt'),
     contextJson: getColumnName(this.tableName, 'context_json'),
@@ -41,11 +42,13 @@ export class SqlExecutionsRepository implements ExecutionsRepository {
 
   private readonly selectClause = `
     SELECT execution.*,
-           agent.agn_name AS agent_name,
+           COALESCE(agent.agn_id, expert.exp_id) AS actor_id,
+           COALESCE(agent.agn_name, expert.exp_name) AS actor_name,
            LEFT(execution.${this.columns.composedPrompt}, 140) AS prompt_preview,
            LEFT(execution.${this.columns.rawOutput}, 140) AS response_preview
     FROM ${this.tableName} execution
-    JOIN agent ON execution.agn_id = agent.agn_id
+    LEFT JOIN agent ON execution.agn_id = agent.agn_id
+    LEFT JOIN expert ON execution.exp_id = expert.exp_id
   `;
 
   async create(input: PersistExecutionInput): Promise<ExecutionDetails> {
@@ -53,6 +56,7 @@ export class SqlExecutionsRepository implements ExecutionsRepository {
       `
         INSERT INTO ${this.tableName} (
           ${this.columns.agentId},
+          ${this.columns.expertId},
           ${this.columns.operationKey},
           ${this.columns.cliId},
           ${this.columns.model},
@@ -69,7 +73,9 @@ export class SqlExecutionsRepository implements ExecutionsRepository {
           ${this.columns.userInput},
           ${this.columns.executedAt}
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, $10, $11, $12, $13, $14::jsonb, $15, $16
+          (SELECT agn_id FROM agent WHERE agn_id = $1),
+          (SELECT exp_id FROM expert WHERE exp_id = $1),
+          $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, $10, $11, $12, $13, $14::jsonb, $15, $16
         )
         RETURNING ${this.columns.id}
       `,
@@ -113,8 +119,11 @@ export class SqlExecutionsRepository implements ExecutionsRepository {
     let index = 1;
 
     if (queryInput.agentId) {
-      clauses.push(`execution.${this.columns.agentId} = $${index++}`);
+      clauses.push(
+        `(execution.${this.columns.agentId} = $${index} OR execution.${this.columns.expertId} = $${index})`,
+      );
       params.push(queryInput.agentId);
+      index += 1;
     }
 
     if (queryInput.operationKey) {

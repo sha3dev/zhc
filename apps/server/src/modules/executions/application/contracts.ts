@@ -1,4 +1,4 @@
-import type { Agent, AgentMemorySummary } from '../../agents/domain/agent.js';
+import type { RegistryEntityMemorySummary, RuntimeActor } from '../../agents/domain/expert.js';
 import type { CliToolStatus } from '../../tools/index.js';
 import type { MemoryBlock } from '../domain/execution.js';
 import type { ExecutionsRepository } from './execution-contracts.js';
@@ -15,16 +15,23 @@ export interface PromptFragment {
   path: string;
 }
 
+export interface SkillAsset {
+  content: string;
+  key: string;
+  path: string;
+}
+
 export interface ExecutionOperationDefinition<TParsed = unknown> {
   memoryKeys?: string[];
   operationKey: string;
+  skillKeys?: string[];
   staticFragments?: string[];
   outputSchema?: import('zod').ZodType<TParsed>;
 }
 
 export interface AgentLookup {
-  getById(id: number): Promise<Agent>;
-  listForMemory(): Promise<AgentMemorySummary[]>;
+  getById(id: number): Promise<RuntimeActor>;
+  listForMemory(): Promise<RegistryEntityMemorySummary[]>;
 }
 
 export interface ToolStatusLookup {
@@ -36,8 +43,12 @@ export interface PromptRegistry {
   get(operationKey: string): Promise<PromptAsset>;
 }
 
+export interface SkillRegistry {
+  getMany(keys: string[]): Promise<SkillAsset[]>;
+}
+
 export interface MemoryBuildInput {
-  agent: Agent;
+  agent: RuntimeActor;
   context?: unknown;
   operationKey: string;
   userInput: string;

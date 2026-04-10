@@ -13,4 +13,9 @@ export const EXECUTION_OPERATIONS: Record<string, ExecutionOperationDefinition> 
     operationKey: 'create-expert-draft',
     staticFragments: [],
   },
+  'execute-task': {
+    operationKey: 'execute-task',
+    skillKeys: ['playwright-browser', 'dokku', 'postgres', 'http-client', 'email'],
+    staticFragments: [],
+  },
 };

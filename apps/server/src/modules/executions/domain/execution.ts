@@ -6,6 +6,7 @@ export const promptBlockKinds = [
   'identity',
   'command',
   'memory',
+  'skill',
   'context',
   'input',
   'static',
@@ -107,8 +108,8 @@ export interface PersistExecutionInput {
 }
 
 export interface ExecutionRecord {
-  agn_id: number;
-  agent_name: string;
+  actor_id: number;
+  actor_name: string;
   exe_cli_id: string;
   exe_composed_prompt: string;
   exe_context_json: unknown;

@@ -35,6 +35,7 @@ interface ExpertDraft {
 export default function Experts() {
   const navigate = useNavigate();
   const [experts, setExperts] = useState<AgentSummary[]>([]);
+  const [ceoReady, setCeoReady] = useState(false);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
@@ -57,8 +58,12 @@ export default function Experts() {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchJson<{ items: AgentSummary[] }>(`/experts?${buildQuery()}`);
-      setExperts(data.items);
+      const [expertsData, agentsData] = await Promise.all([
+        fetchJson<{ items: AgentSummary[] }>(`/experts?${buildQuery()}`),
+        fetchJson<{ items: AgentSummary[] }>('/agents?limit=100'),
+      ]);
+      setExperts(expertsData.items);
+      setCeoReady(agentsData.items.some((agent) => agent.isCeo && agent.status === 'ready'));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load experts.');
     } finally {
@@ -139,7 +144,7 @@ export default function Experts() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
           <SectionHeader label="EXPERT REGISTRY" />
-          <h1 className="font-mono text-xl font-bold text-foreground sm:text-2xl">
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-2xl">
             experts
             <span
               className="ml-1 animate-cursor-blink text-primary"
@@ -148,19 +153,22 @@ export default function Experts() {
               |
             </span>
           </h1>
-          <p className="hidden font-code text-xs text-muted-foreground sm:block">
+          <p className="hidden font-code text-muted-foreground text-xs sm:block">
             {'$ list --experts --external-advisors'}
           </p>
         </div>
         <button
           type="button"
+          disabled={!ceoReady}
           onClick={() => {
+            if (!ceoReady) return;
             setDraftPrompt('');
             setFormError('');
             setShowPrompt(true);
           }}
-          className="mt-1 flex shrink-0 items-center gap-1.5 border border-primary px-3 py-1.5 font-mono text-xs tracking-widest text-primary transition-all duration-150 hover:bg-primary/10 active:scale-[0.96] sm:px-4"
-          style={{ boxShadow: '0 0 6px rgba(55,247,18,0.2)' }}
+          className="mt-1 flex shrink-0 items-center gap-1.5 border border-primary px-3 py-1.5 font-mono text-primary text-xs tracking-widest transition-all duration-150 hover:bg-primary/10 active:scale-[0.96] disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground disabled:hover:bg-transparent sm:px-4"
+          style={ceoReady ? { boxShadow: '0 0 6px rgba(55,247,18,0.2)' } : undefined}
+          title={ceoReady ? 'Add expert' : 'The CEO must be ready before experts can be added'}
         >
           <Plus className="h-3 w-3" />
           <span className="hidden sm:inline">[ ADD EXPERT ]</span>
@@ -169,20 +177,25 @@ export default function Experts() {
       </div>
 
       {notice && (
-        <div className="animate-toast border border-primary/40 bg-primary/5 px-3 py-2 font-mono text-xs text-primary">
+        <div className="animate-toast border border-primary/40 bg-primary/5 px-3 py-2 font-mono text-primary text-xs">
           {notice}
         </div>
       )}
       {error && (
-        <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive">
+        <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">
           {`> error: ${error}`}
+        </div>
+      )}
+      {!ceoReady && !error && (
+        <div className="animate-toast border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-warning text-xs">
+          {'> the CEO must be ready before experts can be added.'}
         </div>
       )}
 
       <div className="flex flex-col gap-1">
         <Label htmlFor="search-experts">search.query</Label>
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+          <Search className="-translate-y-1/2 absolute top-1/2 left-2 h-3 w-3 text-muted-foreground" />
           <Input
             id="search-experts"
             type="search"
@@ -209,7 +222,7 @@ export default function Experts() {
               <TableRow className="cursor-default hover:bg-transparent">
                 <TableCell
                   colSpan={2}
-                  className="py-10 text-center font-code text-xs text-muted-foreground"
+                  className="py-10 text-center font-code text-muted-foreground text-xs"
                 >
                   {'> no experts match the current filters.'}
                 </TableCell>
@@ -223,7 +236,7 @@ export default function Experts() {
                   style={{ animationDelay: `${index * 30}ms` }}
                 >
                   <TableCell>
-                    <span className="font-mono text-xs font-bold text-foreground">
+                    <span className="font-bold font-mono text-foreground text-xs">
                       [xp] {expert.name}
                     </span>
                   </TableCell>
@@ -271,10 +284,10 @@ export default function Experts() {
                 <div className="flex items-start gap-2">
                   <WandSparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
                   <div className="space-y-1">
-                    <p className="font-code text-2xs uppercase tracking-widest text-primary">
+                    <p className="font-code text-2xs text-primary uppercase tracking-widest">
                       auto generation
                     </p>
-                    <p className="font-code text-xs leading-relaxed text-muted-foreground">
+                    <p className="font-code text-muted-foreground text-xs leading-relaxed">
                       The brief is converted into an expert `name` and `subagent_md`, then saved
                       immediately.
                     </p>
@@ -295,7 +308,7 @@ export default function Experts() {
                 </p>
               </div>
               {formError && (
-                <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive">
+                <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">
                   {`> error: ${formError}`}
                 </div>
               )}
@@ -324,7 +337,7 @@ export default function Experts() {
             <DialogDescription>this action is irreversible.</DialogDescription>
           </DialogHeader>
           <DialogBody>
-            <p className="font-code text-xs text-muted-foreground">
+            <p className="font-code text-muted-foreground text-xs">
               {'> remove '}
               <strong className="text-foreground">{expertToDelete?.name}</strong>
               {' from expert registry.'}

@@ -23,6 +23,10 @@ describe('Database Naming Utilities', () => {
       expect(getTablePrefix('project')).toBe('prj');
     });
 
+    it('should return registered prefix for expert', () => {
+      expect(getTablePrefix('expert')).toBe('exp');
+    });
+
     it('should return registered prefix for agent_skill', () => {
       expect(getTablePrefix('agent_skill')).toBe('ask');
     });

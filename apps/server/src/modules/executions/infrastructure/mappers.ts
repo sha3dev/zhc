@@ -11,8 +11,8 @@ export function createExecutionPreview(content: string, maxLength = 140): string
 
 export function toExecutionSummary(record: ExecutionRecord): ExecutionSummary {
   return {
-    agentId: record.agn_id,
-    agentName: record.agent_name,
+    agentId: record.actor_id,
+    agentName: record.actor_name,
     cliId: record.exe_cli_id,
     durationMs: record.exe_duration_ms,
     executedAt: record.exe_executed_at,

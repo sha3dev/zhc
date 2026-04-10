@@ -12,6 +12,8 @@ const NONINTERACTIVE_ENV = {
   TERM: 'dumb',
 };
 
+const CLI_RUN_TIMEOUT_MS = 120_000;
+
 interface SpawnResult {
   exitCode: number | null;
   stderr: string;
@@ -25,11 +27,24 @@ export async function runCliCommand(
   stdin: string | null,
 ): Promise<SpawnResult> {
   return await new Promise((resolve, reject) => {
+    let settled = false;
     const child = spawn(command, args, {
       cwd: workingDirectory,
       env: NONINTERACTIVE_ENV,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!settled) {
+          child.kill('SIGKILL');
+        }
+      }, 5_000).unref();
+    }, CLI_RUN_TIMEOUT_MS);
 
     let stdout = '';
     let stderr = '';
@@ -41,9 +56,13 @@ export async function runCliCommand(
       stderr += chunk.toString();
     });
     child.on('error', (error) => {
+      settled = true;
+      clearTimeout(timeout);
       reject(new InfrastructureError(`Failed to spawn ${command}`, { cause: error }));
     });
     child.on('close', (exitCode) => {
+      settled = true;
+      clearTimeout(timeout);
       resolve({ exitCode, stderr, stdout });
     });
 

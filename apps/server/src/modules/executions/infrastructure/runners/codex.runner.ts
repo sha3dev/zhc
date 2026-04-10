@@ -1,10 +1,10 @@
-import type { ModelRunner, ModelRunRequest, ModelRunResponse } from '../../application/contracts.js';
-import {
-  assertSuccessfulRun,
-  readTempFile,
-  runCliCommand,
-  withTempFile,
-} from './shared.js';
+import { InfrastructureError } from '../../../../shared/errors/app-error.js';
+import type {
+  ModelRunRequest,
+  ModelRunResponse,
+  ModelRunner,
+} from '../../application/contracts.js';
+import { assertSuccessfulRun, readTempFile, runCliCommand, withTempFile } from './shared.js';
 
 export class CodexRunner implements ModelRunner {
   readonly cliId = 'codex';
@@ -29,6 +29,14 @@ export class CodexRunner implements ModelRunner {
       assertSuccessfulRun('codex', result.exitCode, result.stderr, result.stdout);
 
       const rawOutput = (await readTempFile(outputPath)).trim() || result.stdout.trim();
+      if (/(^|\n)(?:\[[^\n]+\]\s*)?ERROR:/m.test(rawOutput)) {
+        throw new InfrastructureError('codex execution returned an error response', {
+          details: {
+            rawOutput,
+          },
+        });
+      }
+
       return { rawOutput };
     });
   }

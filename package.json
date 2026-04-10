@@ -9,6 +9,12 @@
     "start": "npm run start -w @zhc/server",
     "seed:agents": "npm exec -w @zhc/server tsx ../../scripts/seed-agents.ts",
     "seed:agents:reset": "npm exec -w @zhc/server tsx ../../scripts/seed-agents.ts -- --reset",
+    "harness:browser": "node harness/tools/browser.mjs",
+    "harness:browser:install": "npx playwright install chromium",
+    "harness:dokku": "node harness/tools/dokku.mjs",
+    "harness:email": "node harness/tools/email.mjs",
+    "harness:http": "node harness/tools/http.mjs",
+    "harness:postgres": "node harness/tools/postgres.mjs",
     "lint": "biome check .",
     "typecheck": "npm run typecheck -w @zhc/web && npm run typecheck -w @zhc/server",
     "test": "npm run test -w @zhc/server",
@@ -19,11 +25,12 @@
     "npm": ">=10.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@biomejs/biome": "^1.9.4",
     "concurrently": "9.2.1",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2"
+    "lint-staged": "^15.5.2",
+    "playwright": "1.59.1"
   }
 }

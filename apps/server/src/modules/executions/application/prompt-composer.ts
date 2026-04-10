@@ -1,4 +1,5 @@
 import type { MemoryBlock, PromptBlock } from '../domain/execution.js';
+import type { SkillAsset } from './contracts.js';
 
 function serializeValue(value: unknown): string {
   if (value === undefined) {
@@ -19,6 +20,17 @@ function shouldIncludeBlock(block: PromptBlock): boolean {
   }
 
   return block.content.trim().length > 0;
+}
+
+export function createSkillsBlock(skills: SkillAsset[]): PromptBlock {
+  return {
+    content: skills
+      .map((skill) => [`## ${skill.key}`, skill.content.trim()].join('\n\n'))
+      .join('\n\n'),
+    key: 'skills',
+    kind: 'skill',
+    title: 'Skills',
+  };
 }
 
 export function createIdentityBlock(subagentMd: string): PromptBlock {
@@ -66,6 +78,7 @@ export function composePromptBlocks(params: {
   context: unknown;
   memoryBlocks: MemoryBlock[];
   operationKey: string;
+  skills: SkillAsset[];
   subagentMd: string;
   userInput: string;
 }): PromptBlock[] {
@@ -73,6 +86,7 @@ export function composePromptBlocks(params: {
     createIdentityBlock(params.subagentMd),
     createCommandBlock(params.operationKey, params.command),
     ...params.memoryBlocks,
+    createSkillsBlock(params.skills),
     createContextBlock(params.context),
     createUserInputBlock(params.userInput),
   ].filter(shouldIncludeBlock);

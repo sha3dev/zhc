@@ -26,6 +26,7 @@ describe('prompt composer', () => {
         },
       ],
       operationKey: 'create-project',
+      skills: [],
       subagentMd: '# Role\nCEO',
       userInput: 'build app',
     });
@@ -65,6 +66,7 @@ describe('prompt composer', () => {
         },
       ],
       operationKey: 'create-expert-draft',
+      skills: [],
       subagentMd: '# Role\nCEO',
       userInput: 'build app',
     });
@@ -76,5 +78,45 @@ describe('prompt composer', () => {
     expect(prompt).not.toContain('# Memory: Available Experts');
     expect(prompt).not.toContain('\nnull');
     expect(prompt).not.toContain('\n[]');
+  });
+
+  it('places skills after memory and before context', () => {
+    const blocks = composePromptBlocks({
+      command: 'Do the operation',
+      context: { requestId: 'abc' },
+      memoryBlocks: [
+        {
+          content: 'Rules',
+          key: 'general-rules',
+          kind: 'static',
+          source: 'static',
+          title: 'General Rules',
+        },
+      ],
+      operationKey: 'execute-task',
+      skills: [
+        {
+          content: 'Use browser.mjs for Playwright.',
+          key: 'playwright-browser',
+          path: '/tmp/playwright-browser.md',
+        },
+      ],
+      subagentMd: '# Role\nFrontend Engineer',
+      userInput: 'test the app',
+    });
+
+    expect(blocks.map((block) => block.kind)).toEqual([
+      'identity',
+      'command',
+      'static',
+      'skill',
+      'context',
+      'input',
+    ]);
+
+    const prompt = serializePromptBlocks(blocks);
+    expect(prompt.indexOf('# General Rules')).toBeLessThan(prompt.indexOf('# Skills'));
+    expect(prompt.indexOf('# Skills')).toBeLessThan(prompt.indexOf('# Execution Context'));
+    expect(prompt).toContain('## playwright-browser');
   });
 });

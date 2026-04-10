@@ -12,6 +12,7 @@ export {
   createCommandBlock,
   createContextBlock,
   createIdentityBlock,
+  createSkillsBlock,
   createUserInputBlock,
   serializePromptBlocks,
 } from './application/prompt-composer.js';
@@ -26,6 +27,8 @@ export type {
   PromptAsset,
   PromptFragment,
   PromptRegistry,
+  SkillAsset,
+  SkillRegistry,
   ToolStatusLookup,
 } from './application/contracts.js';
 export { EXECUTION_OPERATIONS } from './application/operations.js';
@@ -43,6 +46,7 @@ export type {
 } from './domain/execution.js';
 export { executionModes, promptBlockKinds } from './domain/execution.js';
 export { FileSystemPromptRegistry } from './infrastructure/file-system-prompt-registry.js';
+export { FileSystemSkillRegistry } from './infrastructure/file-system-skill-registry.js';
 export { SqlExecutionsRepository } from './infrastructure/sql-executions.repository.js';
 export { ClaudeCodeRunner } from './infrastructure/runners/claude-code.runner.js';
 export { CodexRunner } from './infrastructure/runners/codex.runner.js';

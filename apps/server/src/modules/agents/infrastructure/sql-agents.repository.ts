@@ -252,7 +252,6 @@ export class SqlAgentsRepository implements AgentsRepository {
 
     const agentsByKind = {
       ceo: 0,
-      expert: 0,
       specialist: 0,
     } as AgentStats['agentsByKind'];
     const agentsByModel: Record<string, number> = {};

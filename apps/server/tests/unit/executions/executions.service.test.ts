@@ -9,6 +9,7 @@ import type {
   ModelRunner,
   PromptAsset,
   PromptRegistry,
+  SkillRegistry,
 } from '../../../src/modules/executions/index.js';
 import { ValidationError } from '../../../src/shared/errors/app-error.js';
 
@@ -118,6 +119,18 @@ function createMemoryProvider(): MemoryProvider {
   };
 }
 
+function createSkillRegistry(): SkillRegistry {
+  return {
+    getMany: vi.fn(async (keys) =>
+      keys.map((key) => ({
+        content: `Skill instructions for ${key}.`,
+        key,
+        path: `/tmp/skills/${key}.md`,
+      })),
+    ),
+  };
+}
+
 describe('ExecutionsService', () => {
   it('rejects execution for an unknown agent', async () => {
     const service = new ExecutionsService(
@@ -216,7 +229,7 @@ describe('ExecutionsService', () => {
   it('composes the prompt in the expected order', async () => {
     const capture: { last?: ModelRunRequest } = {};
     const runner = createRunner(
-      '{"name":"x","definitionBrief":"y","tasks":[{"key":"task-1","title":"T","description":"D","sort":0,"dependsOnTaskKeys":[]}]}',
+      '{"name":"x","definitionBrief":"y","supportArtifacts":[{"path":"docs/project-brief.md","title":"Project Brief","content":"# Brief"}],"tasks":[{"key":"task-1","title":"T","description":"D","deliverable":"Deliver something","acceptanceCriteria":["Done"],"implementationNotes":[],"sort":0,"dependsOnTaskKeys":[]}]}',
       capture,
     );
     const repository = createExecutionRepository();
@@ -290,7 +303,7 @@ describe('ExecutionsService', () => {
       repository,
       [
         createRunner(
-          '{"name":"Launch Site","definitionBrief":"Build it","tasks":[{"key":"spec","title":"Spec","description":"Write spec","sort":0,"assignedToAgentKey":"product-designer","dependsOnTaskKeys":[]}]}',
+          '{"name":"Launch Site","definitionBrief":"Build it","supportArtifacts":[{"path":"docs/project-brief.md","title":"Project Brief","content":"# Brief"}],"tasks":[{"key":"spec","title":"Spec","description":"Write spec","deliverable":"Detailed spec doc","acceptanceCriteria":["Spec exists"],"implementationNotes":[],"sort":0,"assignedToAgentKey":"product-designer","dependsOnTaskKeys":[]}]}',
         ),
       ],
     );
@@ -442,6 +455,58 @@ describe('ExecutionsService', () => {
     expect(result.promptBlocks.some((block) => block.key === 'available_agents')).toBe(true);
     expect(result.promptBlocks.some((block) => block.key === 'available_experts')).toBe(true);
     expect(result.promptBlocks.some((block) => block.key === 'general-rules')).toBe(true);
+    expect(repository.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('injects execute-task skills into prompts', async () => {
+    const capture: { last?: ModelRunRequest } = {};
+    const repository = createExecutionRepository();
+    const skills = createSkillRegistry();
+    const service = new ExecutionsService(
+      { getById: vi.fn(async () => createAgent()), listForMemory: vi.fn() },
+      {
+        listStatus: vi.fn(async () => ({
+          cachedAt: null,
+          items: [
+            {
+              command: 'codex',
+              id: 'codex',
+              models: ['gpt-5.4'],
+              name: 'Codex',
+              status: 'configured',
+              version: '1.0.0',
+            },
+          ],
+        })),
+      },
+      createPrompts(),
+      createMemoryProvider(),
+      repository,
+      [createRunner('plain text response', capture)],
+      skills,
+    );
+
+    const result = await service.execute({
+      agentId: 1,
+      context: { taskId: 12 },
+      operationKey: 'execute-task',
+      userInput: 'verify the deployed app',
+    });
+
+    expect(skills.getMany).toHaveBeenCalledWith([
+      'playwright-browser',
+      'dokku',
+      'postgres',
+      'http-client',
+      'email',
+    ]);
+    expect(capture.last?.prompt).toContain('# Skills');
+    expect(capture.last?.prompt).toContain('## playwright-browser');
+    expect(capture.last?.prompt).toContain('Skill instructions for dokku.');
+    expect(capture.last?.prompt.indexOf('# Skills')).toBeLessThan(
+      capture.last?.prompt.indexOf('# Execution Context') ?? -1,
+    );
+    expect(result.promptBlocks.some((block) => block.kind === 'skill')).toBe(true);
     expect(repository.create).toHaveBeenCalledTimes(1);
   });
 

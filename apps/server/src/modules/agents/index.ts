@@ -13,6 +13,17 @@ export {
   updateAgentInputSchema,
 } from './application/contracts.js';
 export type {
+  CreateExpertInput,
+  ExpertsRepository,
+  ListExpertsQuery,
+  UpdateExpertInput,
+} from './application/experts-contracts.js';
+export {
+  createExpertInputSchema,
+  listExpertsQuerySchema,
+  updateExpertInputSchema,
+} from './application/experts-contracts.js';
+export type {
   Agent,
   AgentDetails,
   AgentKind,
@@ -31,7 +42,15 @@ export {
   agentStatuses,
 } from './domain/agent.js';
 export type { DefaultAgentDefinition } from './domain/default-agents.js';
+export type {
+  Expert,
+  ExpertDetails,
+  ExpertSummary,
+  RegistryEntityMemorySummary,
+  RuntimeActor,
+} from './domain/expert.js';
 export { defaultAgentNames, getDefaultAgentsWithDefinitions } from './domain/default-agents.js';
 export { SqlAgentsRepository } from './infrastructure/sql-agents.repository.js';
+export { SqlExpertsRepository } from './infrastructure/sql-experts.repository.js';
 export { createAgentsRouter } from './presentation/http.js';
 export { createExpertsRouter } from './presentation/experts-http.js';

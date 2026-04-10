@@ -12,6 +12,7 @@ import type {
   MemoryProvider,
   ModelRunner,
   PromptRegistry,
+  SkillRegistry,
   ToolStatusLookup,
 } from './contracts.js';
 import type { ListExecutionsQuery } from './execution-contracts.js';
@@ -42,6 +43,7 @@ export class ExecutionsService {
     private readonly memory: MemoryProvider,
     private readonly repository: ExecutionRepositoryLookup,
     private readonly runners: ModelRunner[],
+    private readonly skills: SkillRegistry = { getMany: async () => [] },
   ) {}
 
   async execute<TParsed = unknown>(
@@ -94,6 +96,7 @@ export class ExecutionsService {
       },
       operation?.memoryKeys ?? [],
     );
+    const skillAssets = await this.skills.getMany(operation?.skillKeys ?? []);
     const staticBlocks = [
       createStaticPromptBlock(generalRulesFragment),
       ...(await Promise.all(
@@ -118,6 +121,7 @@ export class ExecutionsService {
       context: input.context,
       memoryBlocks: [...staticBlocks, ...memoryBlocks],
       operationKey: input.operationKey,
+      skills: skillAssets,
       subagentMd: agent.subagentMd,
       userInput: input.userInput,
     });

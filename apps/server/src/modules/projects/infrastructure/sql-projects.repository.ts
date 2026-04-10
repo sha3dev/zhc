@@ -1,11 +1,11 @@
-import { query } from '../../../shared/db/client.js';
+import { query, transaction } from '../../../shared/db/client.js';
 import {
   getColumnName,
   getPrimaryKeyColumn,
   getTimestampColumn,
 } from '../../../shared/db/naming.js';
 import type {
-  CreateProjectInput,
+  CreateStoredProjectInput,
   ListProjectsQuery,
   ProjectsRepository,
   UpdateProjectInput,
@@ -19,53 +19,99 @@ export class SqlProjectsRepository implements ProjectsRepository {
   private readonly columns = {
     createdAt: getTimestampColumn(this.tableName, 'created_at'),
     createdBy: getColumnName(this.tableName, 'created_by'),
-    description: getColumnName(this.tableName, 'description'),
+    definitionBrief: getColumnName(this.tableName, 'definition_brief'),
     id: getPrimaryKeyColumn(this.tableName),
-    name: getColumnName(this.tableName, 'name'),
     ownerAgentId: 'agn_id',
+    planningExecutionId: 'exe_id',
+    name: getColumnName(this.tableName, 'name'),
     slug: getColumnName(this.tableName, 'slug'),
+    sourceBrief: getColumnName(this.tableName, 'source_brief'),
     status: getColumnName(this.tableName, 'status'),
     updatedAt: getTimestampColumn(this.tableName, 'updated_at'),
   };
 
-  async assignOwner(projectId: number, agentId: number): Promise<Project | null> {
-    const result = await query<ProjectRecord>(
-      `
-        UPDATE ${this.tableName}
-        SET ${this.columns.ownerAgentId} = $1,
-            ${this.columns.updatedAt} = CURRENT_TIMESTAMP
-        WHERE ${this.columns.id} = $2
-        RETURNING *
-      `,
-      [agentId, projectId],
-    );
+  private readonly baseSelect = `
+    SELECT project.*,
+           agent.agn_name AS owner_agent_name,
+           (
+             SELECT COUNT(*)::text
+             FROM task
+             WHERE task.prj_id = project.${this.columns.id}
+           ) AS task_count,
+           (
+             SELECT COUNT(*)::text
+             FROM task
+             WHERE task.prj_id = project.${this.columns.id}
+               AND task.tsk_status = 'completed'
+           ) AS completed_task_count
+    FROM ${this.tableName} project
+    LEFT JOIN agent
+      ON project.${this.columns.ownerAgentId} = agent.agn_id
+  `;
 
-    return result.rows[0] ? toProject(result.rows[0]) : null;
+  async assignOwner(projectId: number, agentId: number): Promise<Project | null> {
+    return this.update(projectId, { ownerAgentId: agentId });
   }
 
-  async create(input: CreateProjectInput): Promise<Project> {
+  async create(input: CreateStoredProjectInput): Promise<Project> {
     const result = await query<ProjectRecord>(
       `
         INSERT INTO ${this.tableName} (
           ${this.columns.name},
           ${this.columns.slug},
-          ${this.columns.description},
+          ${this.columns.sourceBrief},
+          ${this.columns.definitionBrief},
           ${this.columns.createdBy},
+          ${this.columns.ownerAgentId},
+          ${this.columns.planningExecutionId},
           ${this.columns.status}
-        ) VALUES ($1, $2, $3, $4, 'draft')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `,
-      [input.name, input.slug ?? createSlug(input.name), input.description, input.createdBy],
+      [
+        input.name,
+        input.slug || createSlug(input.name),
+        input.sourceBrief,
+        input.definitionBrief,
+        input.createdBy,
+        input.ownerAgentId,
+        input.planningExecutionId,
+        input.status ?? 'draft',
+      ],
     );
 
-    return toProject(result.rows[0]!);
+    return this.enrich(result.rows[0]!.prj_id);
   }
 
   async delete(projectId: number): Promise<boolean> {
-    const result = await query(`DELETE FROM ${this.tableName} WHERE ${this.columns.id} = $1`, [
-      projectId,
-    ]);
-    return (result.rowCount ?? 0) > 0;
+    return transaction(async (client) => {
+      const projectResult = await client.query<{ exe_id: number | null }>(
+        `
+          SELECT ${this.columns.planningExecutionId} AS exe_id
+          FROM ${this.tableName}
+          WHERE ${this.columns.id} = $1
+        `,
+        [projectId],
+      );
+
+      const project = projectResult.rows[0];
+      if (!project) {
+        return false;
+      }
+
+      await client.query('DELETE FROM task WHERE prj_id = $1', [projectId]);
+
+      const deleteProjectResult = await client.query(
+        `DELETE FROM ${this.tableName} WHERE ${this.columns.id} = $1`,
+        [projectId],
+      );
+
+      if (project.exe_id) {
+        await client.query('DELETE FROM execution WHERE exe_id = $1', [project.exe_id]);
+      }
+
+      return (deleteProjectResult.rowCount ?? 0) > 0;
+    });
   }
 
   async findAll(filters: ListProjectsQuery): Promise<{ projects: Project[]; total: number }> {
@@ -74,40 +120,39 @@ export class SqlProjectsRepository implements ProjectsRepository {
     let index = 1;
 
     if (filters.slug) {
-      clauses.push(`${this.columns.slug} = $${index++}`);
+      clauses.push(`project.${this.columns.slug} = $${index++}`);
       params.push(filters.slug);
     }
 
     if (filters.status) {
-      clauses.push(`${this.columns.status} = $${index++}`);
+      clauses.push(`project.${this.columns.status} = $${index++}`);
       params.push(filters.status);
     }
 
     if (filters.createdBy) {
-      clauses.push(`${this.columns.createdBy} = $${index++}`);
+      clauses.push(`project.${this.columns.createdBy} = $${index++}`);
       params.push(filters.createdBy);
     }
 
     if (filters.search) {
       clauses.push(
-        `(${this.columns.name} ILIKE $${index++} OR ${this.columns.description} ILIKE $${index++})`,
+        `(project.${this.columns.name} ILIKE $${index++} OR project.${this.columns.sourceBrief} ILIKE $${index++} OR project.${this.columns.definitionBrief} ILIKE $${index++})`,
       );
-      params.push(`%${filters.search}%`, `%${filters.search}%`);
+      params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
     }
 
     const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
 
     const countResult = await query<{ total: string }>(
-      `SELECT COUNT(*)::text AS total FROM ${this.tableName} ${whereClause}`,
+      `SELECT COUNT(*)::text AS total FROM ${this.tableName} project ${whereClause}`,
       params,
     );
 
     const dataResult = await query<ProjectRecord>(
       `
-        SELECT *
-        FROM ${this.tableName}
+        ${this.baseSelect}
         ${whereClause}
-        ORDER BY ${this.columns.createdAt} DESC
+        ORDER BY project.${this.columns.createdAt} DESC
         LIMIT $${index++}
         OFFSET $${index++}
       `,
@@ -122,7 +167,10 @@ export class SqlProjectsRepository implements ProjectsRepository {
 
   async findById(id: number): Promise<Project | null> {
     const result = await query<ProjectRecord>(
-      `SELECT * FROM ${this.tableName} WHERE ${this.columns.id} = $1`,
+      `
+        ${this.baseSelect}
+        WHERE project.${this.columns.id} = $1
+      `,
       [id],
     );
 
@@ -131,7 +179,10 @@ export class SqlProjectsRepository implements ProjectsRepository {
 
   async findBySlug(slug: string): Promise<Project | null> {
     const result = await query<ProjectRecord>(
-      `SELECT * FROM ${this.tableName} WHERE ${this.columns.slug} = $1`,
+      `
+        ${this.baseSelect}
+        WHERE project.${this.columns.slug} = $1
+      `,
       [slug],
     );
 
@@ -140,7 +191,7 @@ export class SqlProjectsRepository implements ProjectsRepository {
 
   async update(projectId: number, input: UpdateProjectInput): Promise<Project | null> {
     const updates: string[] = [];
-    const params: Array<number | string> = [];
+    const params: Array<number | string | null> = [];
     let index = 1;
 
     if (input.name !== undefined) {
@@ -153,14 +204,29 @@ export class SqlProjectsRepository implements ProjectsRepository {
       params.push(input.slug);
     }
 
-    if (input.description !== undefined) {
-      updates.push(`${this.columns.description} = $${index++}`);
-      params.push(input.description);
+    if (input.sourceBrief !== undefined) {
+      updates.push(`${this.columns.sourceBrief} = $${index++}`);
+      params.push(input.sourceBrief);
+    }
+
+    if (input.definitionBrief !== undefined) {
+      updates.push(`${this.columns.definitionBrief} = $${index++}`);
+      params.push(input.definitionBrief);
     }
 
     if (input.status !== undefined) {
       updates.push(`${this.columns.status} = $${index++}`);
       params.push(input.status);
+    }
+
+    if (input.ownerAgentId !== undefined) {
+      updates.push(`${this.columns.ownerAgentId} = $${index++}`);
+      params.push(input.ownerAgentId);
+    }
+
+    if (input.planningExecutionId !== undefined) {
+      updates.push(`${this.columns.planningExecutionId} = $${index++}`);
+      params.push(input.planningExecutionId);
     }
 
     if (updates.length === 0) {
@@ -173,15 +239,25 @@ export class SqlProjectsRepository implements ProjectsRepository {
         SET ${updates.join(', ')},
             ${this.columns.updatedAt} = CURRENT_TIMESTAMP
         WHERE ${this.columns.id} = $${index}
-        RETURNING *
+        RETURNING ${this.columns.id}
       `,
       [...params, projectId],
     );
 
-    return result.rows[0] ? toProject(result.rows[0]) : null;
+    return result.rows[0] ? this.findById(result.rows[0].prj_id) : null;
   }
 
   updateStatus(projectId: number, status: Project['status']): Promise<Project | null> {
     return this.update(projectId, { status });
+  }
+
+  private async enrich(projectId: number): Promise<Project> {
+    const project = await this.findById(projectId);
+
+    if (!project) {
+      throw new Error(`Failed to load project ${projectId} after persistence`);
+    }
+
+    return project;
   }
 }

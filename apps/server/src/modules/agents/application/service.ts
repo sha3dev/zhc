@@ -14,13 +14,11 @@ import type {
 } from './contracts.js';
 
 export class AgentsService {
-  private readonly operationalKinds = ['ceo', 'specialist'] as const;
-
   constructor(private readonly repository: AgentsRepository) {}
 
   async archive(id: number): Promise<boolean> {
     const agent = await this.repository.findById(id);
-    if (!agent || agent.kind === 'expert') {
+    if (!agent) {
       throw new NotFoundError(`Agent ${id} not found`);
     }
 
@@ -49,7 +47,7 @@ export class AgentsService {
   async getById(id: number): Promise<AgentDetails> {
     const agent = await this.repository.findByIdWithRelations(id);
 
-    if (!agent || agent.kind === 'expert') {
+    if (!agent) {
       throw new NotFoundError(`Agent ${id} not found`);
     }
 
@@ -57,13 +55,13 @@ export class AgentsService {
   }
 
   list(query: ListAgentsQuery): Promise<{ agents: Agent[]; total: number }> {
-    return this.repository.findAll({ ...query, kinds: [...this.operationalKinds] });
+    return this.repository.findAll(query);
   }
 
   async update(id: number, input: UpdateAgentInput): Promise<Agent> {
     const current = await this.repository.findById(id);
 
-    if (!current || current.kind === 'expert') {
+    if (!current) {
       throw new NotFoundError(`Agent ${id} not found`);
     }
 

@@ -44,31 +44,6 @@ describe('Agent contracts', () => {
 
     expect(result.success).toBe(false);
   });
-
-  it('accepts experts without their own model', () => {
-    const result = createAgentInputSchema.safeParse({
-      kind: 'expert',
-      name: 'Crossfit Expert',
-      subagentMd:
-        '# Role\nCrossfit Expert\n\n## Identity\nCoach with 20 years of experience.\n\n## Expertise\n- Programming\n- Competition\n- Injury prevention',
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects experts with their own model selection', () => {
-    const result = createAgentInputSchema.safeParse({
-      kind: 'expert',
-      model: 'gpt-5.4',
-      modelCliId: 'codex',
-      name: 'Crossfit Expert',
-      subagentMd:
-        '# Role\nCrossfit Expert\n\n## Identity\nCoach with 20 years of experience.\n\n## Expertise\n- Programming\n- Competition\n- Injury prevention',
-    });
-
-    expect(result.success).toBe(false);
-  });
-
   it('rejects empty patch payloads', () => {
     const result = updateAgentInputSchema.safeParse({});
     expect(result.success).toBe(false);

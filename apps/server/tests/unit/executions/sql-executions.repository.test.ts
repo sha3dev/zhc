@@ -11,8 +11,8 @@ vi.mock('../../../src/shared/db/client.js', () => ({
 
 function createRow(overrides: Record<string, unknown> = {}) {
   return {
-    agn_id: 1,
-    agent_name: 'CEO',
+    actor_id: 1,
+    actor_name: 'CEO',
     exe_cli_id: 'codex',
     exe_composed_prompt: 'Prompt body',
     exe_context_json: { repo: 'zhc' },

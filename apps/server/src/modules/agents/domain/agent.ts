@@ -15,7 +15,7 @@ export const agentStatuses = ['ready', 'not_ready', 'suspended'] as const;
 export const agentStatusSchema = z.enum(agentStatuses);
 export type AgentStatus = z.infer<typeof agentStatusSchema>;
 
-export const agentKinds = ['ceo', 'specialist', 'expert'] as const;
+export const agentKinds = ['ceo', 'specialist'] as const;
 export const agentKindSchema = z.enum(agentKinds);
 export type AgentKind = z.infer<typeof agentKindSchema>;
 

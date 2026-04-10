@@ -1,5 +1,6 @@
 const REGISTERED_PREFIXES: Record<string, string> = {
   agent: 'agn',
+  expert: 'exp',
   project: 'prj',
   task: 'tsk',
   soul: 'sol',

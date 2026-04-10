@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { idParamSchema, parseJson, parseParams, parseQuery } from '../../../shared/http/parse.js';
 import {
-  createExecutionPlanInputSchema,
   createProjectInputSchema,
   listProjectsQuerySchema,
   updateProjectInputSchema,
@@ -42,11 +41,10 @@ export function createProjectsRouter(service: ProjectsService): Hono {
     return context.json(project);
   });
 
-  router.post('/:id/execution-plan', async (context) => {
+  router.delete('/:id', async (context) => {
     const { id } = parseParams(context, idParamSchema);
-    const payload = await parseJson(context, createExecutionPlanInputSchema);
-    const project = await service.generateExecutionPlan(id, payload);
-    return context.json(project, 201);
+    const deleted = await service.delete(id);
+    return context.json({ ok: deleted });
   });
 
   return router;
