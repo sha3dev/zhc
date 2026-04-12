@@ -45,7 +45,7 @@ export function AgentStatusPanel({
           <span className="mono-label">runtime state</span>
           <Badge variant={copy.badge}>{copy.title}</Badge>
         </div>
-        <p className="mt-1 truncate font-code text-xs text-muted-foreground sm:pr-4">
+        <p className="mt-1 truncate font-code text-muted-foreground text-xs sm:pr-4">
           {description}
         </p>
       </div>

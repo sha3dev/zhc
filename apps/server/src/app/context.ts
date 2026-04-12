@@ -132,6 +132,8 @@ export function createAppContext(): AppContext {
     registryLookup,
     projects,
     executions,
+    configuration,
+    emails,
   );
 
   const bootstrap = async (): Promise<void> => {

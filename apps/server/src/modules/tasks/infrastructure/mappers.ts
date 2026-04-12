@@ -1,4 +1,9 @@
-import type { TaskEvent, TaskEventRecord } from '../domain/task-event.js';
+import type {
+  TaskEvent,
+  TaskEventAttachment,
+  TaskEventAttachmentRecord,
+  TaskEventRecord,
+} from '../domain/task-event.js';
 import type { Task, TaskRecord } from '../domain/task.js';
 
 export function toTask(record: TaskRecord, dependsOnTaskIds: number[] = []): Task {
@@ -14,9 +19,6 @@ export function toTask(record: TaskRecord, dependsOnTaskIds: number[] = []): Tas
     id: record.tsk_id,
     lastExecutionId: record.exe_id,
     projectId: record.prj_id,
-    reopenCount: record.tsk_reopen_count,
-    reopenedAt: record.tsk_reopened_at,
-    reopenedFromTaskEventId: record.tsk_reopened_from_tev_id,
     reviewCycle: record.tsk_review_cycle,
     runBlockedReason: null,
     sort: record.tsk_sort,
@@ -26,8 +28,22 @@ export function toTask(record: TaskRecord, dependsOnTaskIds: number[] = []): Tas
   };
 }
 
+function toTaskEventAttachment(record: TaskEventAttachmentRecord): TaskEventAttachment {
+  return {
+    id: record.tea_id,
+    kind: record.tea_kind,
+    mediaType: record.tea_media_type,
+    path: record.tea_path,
+    sizeBytes: record.tea_size_bytes,
+    taskEventId: record.tev_id,
+    title: record.tea_title,
+    url: record.tea_url,
+  };
+}
+
 export function toTaskEvent(record: TaskEventRecord): TaskEvent {
   return {
+    attachments: (record.task_event_attachments_json ?? []).map(toTaskEventAttachment),
     authorAgentId: record.actor_id,
     authorAgentName: record.agent_name,
     body: record.tev_body,

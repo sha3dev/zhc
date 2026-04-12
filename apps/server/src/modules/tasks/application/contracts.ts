@@ -2,8 +2,30 @@ import { z } from 'zod';
 import type { TaskEvent } from '../domain/task-event.js';
 import { type Task, taskStatusSchema } from '../domain/task.js';
 
+const taskAttachmentTitleSchema = z.string().trim().min(1).max(255);
+
+export const taskEventAttachmentInputSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('project_file'),
+    mediaType: z.string().trim().min(1).max(255).nullable().optional(),
+    path: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1000)
+      .regex(/^(?!\/)(?!.*\.\.)(?:[a-zA-Z0-9._ -]+\/)*[a-zA-Z0-9._ -]+$/),
+    title: taskAttachmentTitleSchema,
+  }),
+  z.object({
+    kind: z.literal('external_url'),
+    mediaType: z.string().trim().min(1).max(255).nullable().optional(),
+    title: taskAttachmentTitleSchema,
+    url: z.string().trim().url().max(2000),
+  }),
+]);
+
 export const createTaskInputSchema = z.object({
-  assignedToAgentId: z.number().int().positive().nullable().optional(),
+  assignedToAgentId: z.number().int().positive(),
   dependsOnTaskIds: z.array(z.number().int().positive()).default([]),
   description: z.string().trim().min(1),
   projectId: z.number().int().positive(),
@@ -19,35 +41,41 @@ export const taskAuthorSchema = z.object({
   authorAgentId: z.number().int().positive(),
 });
 
-export const taskReplyInputSchema = taskAuthorSchema.extend({
-  body: z.string().trim().min(1),
-  kind: z
-    .enum(['ceo_instruction', 'agent_reply', 'submission', 'changes_requested', 'blocked'])
-    .optional()
-    .default('ceo_instruction'),
-  markAsSubmission: z.boolean().optional().default(false),
-});
-
-export const taskDispatchInputSchema = taskAuthorSchema.extend({
-  agentId: z.number().int().positive().optional(),
+export const taskRunInputSchema = taskAuthorSchema.extend({
   instruction: z.string().trim().min(1).optional(),
   sandboxMode: z.enum(['read-only', 'workspace-write', 'danger-full-access']).optional(),
   workingDirectory: z.string().trim().min(1).optional(),
 });
 
 export const taskApproveInputSchema = taskAuthorSchema.extend({
+  attachments: z.array(taskEventAttachmentInputSchema).max(20).optional(),
   body: z.string().trim().min(1).optional().default('Approved by CEO.'),
 });
 
-export const taskRequestChangesInputSchema = taskAuthorSchema.extend({
+export const taskFeedbackInputSchema = taskAuthorSchema.extend({
+  attachments: z.array(taskEventAttachmentInputSchema).max(20).optional(),
   body: z.string().trim().min(1),
   sandboxMode: z.enum(['read-only', 'workspace-write', 'danger-full-access']).optional(),
   workingDirectory: z.string().trim().min(1).optional(),
 });
 
-export const taskReopenInputSchema = taskAuthorSchema.extend({
+export const taskDenyInputSchema = taskAuthorSchema.extend({
+  attachments: z.array(taskEventAttachmentInputSchema).max(20).optional(),
   body: z.string().trim().min(1),
-  instruction: z.string().trim().min(1).optional(),
+  sandboxMode: z.enum(['read-only', 'workspace-write', 'danger-full-access']).optional(),
+  workingDirectory: z.string().trim().min(1).optional(),
+});
+
+export const taskHumanFeedbackRequestInputSchema = taskAuthorSchema.extend({
+  attachments: z.array(taskEventAttachmentInputSchema).max(20).optional(),
+  body: z.string().trim().min(1),
+});
+
+export const taskAgentResponseSchema = z.object({
+  attachments: z.array(taskEventAttachmentInputSchema).max(20).optional(),
+  body: z.string().trim().min(1),
+  responseType: z.enum(['needs_ceo_feedback', 'ready_for_approval']),
+  summary: z.string().trim().min(1).optional(),
 });
 
 export const listTasksQuerySchema = z.object({
@@ -60,11 +88,13 @@ export const listTasksQuerySchema = z.object({
 
 export type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
-export type TaskReplyInput = z.infer<typeof taskReplyInputSchema>;
-export type TaskDispatchInput = z.infer<typeof taskDispatchInputSchema>;
+export type TaskRunInput = z.infer<typeof taskRunInputSchema>;
 export type TaskApproveInput = z.infer<typeof taskApproveInputSchema>;
-export type TaskRequestChangesInput = z.infer<typeof taskRequestChangesInputSchema>;
-export type TaskReopenInput = z.infer<typeof taskReopenInputSchema>;
+export type TaskFeedbackInput = z.infer<typeof taskFeedbackInputSchema>;
+export type TaskDenyInput = z.infer<typeof taskDenyInputSchema>;
+export type TaskHumanFeedbackRequestInput = z.infer<typeof taskHumanFeedbackRequestInputSchema>;
+export type TaskAgentResponse = z.infer<typeof taskAgentResponseSchema>;
+export type TaskEventAttachmentInput = z.infer<typeof taskEventAttachmentInputSchema>;
 
 export interface TasksRepository {
   assign(taskId: number, agentId: number): Promise<Task | null>;
@@ -81,6 +111,7 @@ export interface TasksRepository {
 }
 
 export interface CreateTaskEventInput {
+  attachments?: TaskEventAttachmentInput[] | null;
   authorAgentId: number;
   body: string;
   executionId?: number | null;
@@ -91,6 +122,14 @@ export interface CreateTaskEventInput {
 
 export interface TaskEventsRepository {
   create(input: CreateTaskEventInput): Promise<TaskEvent>;
+  findAttachment(taskId: number, attachmentId: number): Promise<{
+    eventId: number;
+    kind: TaskEventAttachmentInput['kind'];
+    mediaType: string | null;
+    path: string | null;
+    title: string;
+    url: string | null;
+  } | null>;
   findByTaskId(taskId: number): Promise<TaskEvent[]>;
 }
 
@@ -98,9 +137,6 @@ export interface UpdateTaskInput {
   completedAt?: Date | null;
   hasDependencyRisk?: boolean;
   lastExecutionId?: number | null;
-  reopenedAt?: Date | null;
-  reopenedFromTaskEventId?: number | null;
-  reopenCount?: number;
   reviewCycle?: number;
   status?: Task['status'];
 }

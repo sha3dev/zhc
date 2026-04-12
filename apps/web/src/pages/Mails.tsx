@@ -136,7 +136,7 @@ export default function Mails() {
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <SectionHeader label="MAILS" />
-          <h1 className="font-mono text-xl font-bold text-foreground sm:text-2xl">
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-2xl">
             mails
             <span
               className="ml-1 animate-cursor-blink text-primary"
@@ -145,7 +145,7 @@ export default function Mails() {
               |
             </span>
           </h1>
-          <p className="hidden font-code text-xs text-muted-foreground sm:block">
+          <p className="hidden font-code text-muted-foreground text-xs sm:block">
             agent_orchestrator :: inbound and outbound mail log
           </p>
         </div>
@@ -267,19 +267,19 @@ export default function Mails() {
         </div>
 
         <div className="border border-border bg-card">
-          <div className="border-b border-border px-4 py-3">
-            <p className="font-mono text-xs text-foreground">mail.detail</p>
+          <div className="border-border border-b px-4 py-3">
+            <p className="font-mono text-foreground text-xs">mail.detail</p>
           </div>
           <div className="space-y-4 px-4 py-4">
             {!selectedEmail ? (
-              <p className="font-code text-xs text-muted-foreground">{'> select an email'}</p>
+              <p className="font-code text-muted-foreground text-xs">{'> select an email'}</p>
             ) : (
               <>
                 <div className="space-y-2">
                   <Badge variant={selectedEmail.direction === 'inbound' ? 'info' : 'default'}>
                     {selectedEmail.direction}
                   </Badge>
-                  <h2 className="font-mono text-sm text-foreground">
+                  <h2 className="font-mono text-foreground text-sm">
                     {selectedEmail.subject || '(no subject)'}
                   </h2>
                   <p className="font-code text-2xs text-muted-foreground">
@@ -287,7 +287,7 @@ export default function Mails() {
                   </p>
                 </div>
 
-                <div className="space-y-2 border-t border-border pt-4 font-code text-xs">
+                <div className="space-y-2 border-border border-t pt-4 font-code text-xs">
                   <p>
                     <span className="text-muted-foreground">from:</span>{' '}
                     {selectedEmail.fromName
@@ -338,22 +338,22 @@ export default function Mails() {
                   )}
                 </div>
 
-                <div className="space-y-2 border-t border-border pt-4">
-                  <p className="font-mono text-xs text-foreground">text_body</p>
+                <div className="space-y-2 border-border border-t pt-4">
+                  <p className="font-mono text-foreground text-xs">text_body</p>
                   <pre className="max-h-[240px] overflow-auto whitespace-pre-wrap border border-border bg-muted/20 p-3 font-code text-2xs text-muted-foreground">
                     {selectedEmail.textBody || 'n/a'}
                   </pre>
                 </div>
 
-                <div className="space-y-2 border-t border-border pt-4">
-                  <p className="font-mono text-xs text-foreground">html_body</p>
+                <div className="space-y-2 border-border border-t pt-4">
+                  <p className="font-mono text-foreground text-xs">html_body</p>
                   <pre className="max-h-[160px] overflow-auto whitespace-pre-wrap border border-border bg-muted/20 p-3 font-code text-2xs text-muted-foreground">
                     {selectedEmail.htmlBody || 'n/a'}
                   </pre>
                 </div>
 
-                <div className="space-y-2 border-t border-border pt-4">
-                  <p className="font-mono text-xs text-foreground">raw_payload</p>
+                <div className="space-y-2 border-border border-t pt-4">
+                  <p className="font-mono text-foreground text-xs">raw_payload</p>
                   <pre className="max-h-[240px] overflow-auto whitespace-pre-wrap border border-border bg-muted/20 p-3 font-code text-2xs text-muted-foreground">
                     {JSON.stringify(selectedEmail.rawPayload, null, 2)}
                   </pre>

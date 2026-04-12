@@ -1,6 +1,6 @@
 export function SectionHeader({ label }: { label: string }) {
   return (
-    <p className="font-code text-2xs text-muted-foreground tracking-widest overflow-hidden whitespace-nowrap select-none">
+    <p className="select-none overflow-hidden whitespace-nowrap font-code text-2xs text-muted-foreground tracking-widest">
       {/* Mobile: compact — just brackets */}
       <span className="sm:hidden">
         [{' '}

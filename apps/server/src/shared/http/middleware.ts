@@ -18,10 +18,24 @@ export async function requestLogger(context: Context, next: Next): Promise<void>
   const startedAt = performance.now();
   await next();
 
-  logger.info('HTTP request handled', {
-    durationMs: Math.round(performance.now() - startedAt),
-    method: context.req.method,
-    path: context.req.path,
-    status: context.res.status,
+  const durationMs = Math.round(performance.now() - startedAt);
+  const method = context.req.method;
+  const status = context.res.status;
+  const path = context.req.path;
+  const shouldLog =
+    status >= 400 ||
+    durationMs >= 1000 ||
+    !['GET', 'HEAD', 'OPTIONS'].includes(method);
+
+  if (!shouldLog) {
+    return;
+  }
+
+  const log = status >= 500 ? logger.error : status >= 400 ? logger.warn : logger.info;
+  log('HTTP', {
+    durationMs,
+    method,
+    path,
+    status,
   });
 }

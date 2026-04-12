@@ -39,8 +39,10 @@ export class SqlConfigurationRepository {
     githubClientSecret: getColumnName(this.tableName, 'github_client_secret'),
     githubInstallationId: getColumnName(this.tableName, 'github_installation_id'),
     githubPrivateKey: getColumnName(this.tableName, 'github_private_key'),
+    humanEmail: getColumnName(this.tableName, 'human_email'),
     id: getPrimaryKeyColumn(this.tableName),
     resendApiKey: getColumnName(this.tableName, 'resend_api_key'),
+    steelApiKey: getColumnName(this.tableName, 'steel_api_key'),
     updatedAt: getTimestampColumn(this.tableName, 'updated_at'),
   };
 
@@ -89,6 +91,8 @@ export class SqlConfigurationRepository {
     );
     pushUpdate(this.columns.emailPollEnabled, input.email?.pollEnabled);
     pushUpdate(this.columns.emailPollIntervalSeconds, input.email?.pollIntervalSeconds);
+    pushUpdate(this.columns.humanEmail, normalizeOptionalString(input.human?.email));
+    pushUpdate(this.columns.steelApiKey, normalizeOptionalString(input.steel?.apiKey));
 
     if (updates.length === 0) {
       return toInternalConfiguration(existing);

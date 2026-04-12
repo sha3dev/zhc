@@ -1,12 +1,13 @@
-import { exec, spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { invalidateCliResolutionCache, resolveCliCommand } from '../../../shared/system/cli-resolver.js';
 import { CLI_TOOLS } from '../domain/tool.js';
 import type { CliStatus, CliTool, CliToolStatus } from '../domain/tool.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** Env vars that disable interactive TUI behaviour in most CLIs */
 const NONINTERACTIVE_ENV = {
@@ -15,6 +16,12 @@ const NONINTERACTIVE_ENV = {
   NO_COLOR: '1',
   FORCE_COLOR: '0',
   CI: '1',
+};
+
+const VERSION_CHECK_ENV = {
+  ...process.env,
+  NO_COLOR: '1',
+  FORCE_COLOR: '0',
 };
 
 const ESC = String.fromCharCode(27);
@@ -53,17 +60,58 @@ function isModelName(s: string): boolean {
 }
 
 async function detectVersion(command: string): Promise<string | null> {
-  try {
-    const { stdout, stderr } = await execAsync(`${command} --version`, {
-      timeout: 3000,
-      env: NONINTERACTIVE_ENV,
-    });
-    const raw = stripAnsi((stdout || stderr).trim());
-    const match = raw.match(/\d+\.\d+[\d.]*/);
-    return match ? match[0] : (raw.split('\n')[0] ?? raw);
-  } catch {
+  const resolved = await resolveCliCommand(command);
+  if (!resolved) {
     return null;
   }
+
+  return await new Promise((resolve) => {
+    const child = spawn(resolved, ['--version'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: VERSION_CHECK_ENV,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const finish = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', () => finish(null));
+    child.on('close', (code) => {
+      if (code !== 0) {
+        finish(null);
+        return;
+      }
+
+      const raw = stripAnsi((stdout || stderr).trim());
+      if (!raw) {
+        finish(null);
+        return;
+      }
+
+      const match = raw.match(/\d+\.\d+[\d.]*/);
+      finish(match ? match[0] : (raw.split('\n')[0] ?? raw));
+    });
+
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(null);
+    }, 3000);
+  });
 }
 
 /**
@@ -73,7 +121,14 @@ async function detectVersion(command: string): Promise<string | null> {
 async function checkAuth(tool: CliTool): Promise<boolean> {
   if (!tool.authCommand) return false;
   try {
-    const { stdout } = await execAsync(tool.authCommand, {
+    const parts = tool.authCommand.split(' ');
+    const command = parts[0] ?? '';
+    const resolved = await resolveCliCommand(command);
+    if (!resolved) {
+      return false;
+    }
+
+    const { stdout } = await execFileAsync(resolved, parts.slice(1), {
       timeout: 5000,
       env: NONINTERACTIVE_ENV,
     });
@@ -148,6 +203,25 @@ async function readCodexModels(): Promise<string[]> {
   }
 }
 
+async function readOpenCodeVersion(): Promise<string | null> {
+  try {
+    const packagePath = join(homedir(), '.opencode', 'package.json');
+    const content = await readFile(packagePath, 'utf-8');
+    const data = JSON.parse(content) as {
+      dependencies?: Record<string, string>;
+      version?: string;
+    };
+    if (typeof data.version === 'string' && data.version.trim()) {
+      return data.version.trim();
+    }
+
+    const pluginVersion = data.dependencies?.['@opencode-ai/plugin'];
+    return typeof pluginVersion === 'string' && pluginVersion.trim() ? pluginVersion.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 interface GeminiSettingsFile {
   selectedAuthType?: string;
 }
@@ -182,12 +256,18 @@ async function hasGeminiPersonalLogin(): Promise<boolean> {
  * { ran: false } — non-zero exit or timeout
  */
 function fetchCliModels(modelsCommand: string): Promise<{ ran: boolean; models: string[] }> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const parts = modelsCommand.split(' ');
     const cmd = parts[0] ?? '';
     const args = parts.slice(1);
+    const resolved = await resolveCliCommand(cmd);
 
-    const child = spawn(cmd, args, {
+    if (!resolved) {
+      resolve({ ran: false, models: [] });
+      return;
+    }
+
+    const child = spawn(resolved, args, {
       // 'ignore' stdin → closes stdin fd immediately, preventing CPR response hangs
       stdio: ['ignore', 'pipe', 'pipe'],
       env: NONINTERACTIVE_ENV,
@@ -263,7 +343,8 @@ function fetchCliModels(modelsCommand: string): Promise<{ ran: boolean; models: 
 }
 
 async function fetchToolStatus(tool: CliTool): Promise<CliToolStatus> {
-  const version = await detectVersion(tool.command);
+  const version =
+    (await detectVersion(tool.command)) ?? (tool.id === 'opencode' ? await readOpenCodeVersion() : null);
 
   if (!version) {
     return {
@@ -304,8 +385,8 @@ async function fetchToolStatus(tool: CliTool): Promise<CliToolStatus> {
   } else if (tool.modelsCommand) {
     // opencode (and any future tool): modelsCommand exit code doubles as auth signal
     const result = await fetchCliModels(tool.modelsCommand);
-    authenticated = result.ran;
-    models = result.models;
+    authenticated = result.ran || tool.id === 'opencode';
+    models = result.models.length > 0 ? result.models : (tool.knownModels ?? []);
   } else {
     authenticated = false;
     models = [];
@@ -336,6 +417,7 @@ export class ToolsService {
 
   /** Clears the in-memory cache; the next listStatus() call will re-fetch. */
   invalidate(): void {
+    invalidateCliResolutionCache();
     this.cached = null;
     this.cachedAt = null;
   }

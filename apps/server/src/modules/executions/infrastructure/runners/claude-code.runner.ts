@@ -1,4 +1,8 @@
-import type { ModelRunner, ModelRunRequest, ModelRunResponse } from '../../application/contracts.js';
+import type {
+  ModelRunRequest,
+  ModelRunResponse,
+  ModelRunner,
+} from '../../application/contracts.js';
 import { assertSuccessfulRun, runCliCommand } from './shared.js';
 
 export class ClaudeCodeRunner implements ModelRunner {

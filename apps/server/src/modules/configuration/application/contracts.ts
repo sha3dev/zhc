@@ -32,6 +32,16 @@ export const updateConfigurationInputSchema = z
         privateKey: optionalTrimmedStringSchema,
       })
       .optional(),
+    human: z
+      .object({
+        email: optionalTrimmedShortStringSchema,
+      })
+      .optional(),
+    steel: z
+      .object({
+        apiKey: z.string().max(10_000).optional(),
+      })
+      .optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided',

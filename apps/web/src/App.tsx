@@ -6,6 +6,7 @@ import ExecutionDetail from '@/pages/ExecutionDetail';
 import Executions from '@/pages/Executions';
 import ExpertDetail from '@/pages/ExpertDetail';
 import Experts from '@/pages/Experts';
+import Files from '@/pages/Files';
 import Mails from '@/pages/Mails';
 import ProjectDetail from '@/pages/ProjectDetail';
 import Projects from '@/pages/Projects';
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/experts/:id" element={<ExpertDetail />} />
           <Route path="/executions" element={<Executions />} />
           <Route path="/executions/:id" element={<ExecutionDetail />} />
+          <Route path="/files" element={<Files />} />
           <Route path="/mails" element={<Mails />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

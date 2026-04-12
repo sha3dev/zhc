@@ -5,6 +5,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../../shared/errors/app-error.js';
+import { logger } from '../../../shared/observability/logger.js';
 import type { ExecutionDetails, ExecutionRequest, ExecutionResult } from '../domain/execution.js';
 import type {
   AgentLookup,
@@ -51,6 +52,13 @@ export class ExecutionsService {
   ): Promise<ExecutionResult<TParsed>> {
     const startedAt = Date.now();
     const agent = await this.agents.getById(input.agentId);
+    logger.info('Execution queued', {
+      actor: agent.name,
+      actorId: agent.id,
+      operationKey: input.operationKey,
+      sandboxMode: input.sandboxMode ?? 'read-only',
+      workingDirectory: input.workingDirectory ?? cwd(),
+    });
 
     if (agent.status !== 'ready') {
       throw new ValidationError(`Agent ${agent.id} is not ready`);
@@ -134,7 +142,17 @@ export class ExecutionsService {
       model: agent.model,
       prompt: composedPrompt,
       sandboxMode,
+      timeoutMs: operation?.timeoutMs,
       workingDirectory,
+    });
+    logger.info('Execution runner completed', {
+      actor: agent.name,
+      actorId: agent.id,
+      cliId: availableTool.id,
+      durationMs: Date.now() - startedAt,
+      model: agent.model,
+      operationKey: input.operationKey,
+      rawOutputLength: raw.rawOutput.length,
     });
 
     const schema = this.resolveSchema(input.operationKey, input.outputSchema);
@@ -145,8 +163,19 @@ export class ExecutionsService {
       const parsed = schema.safeParse(this.tryParseJson(raw.rawOutput));
       if (parsed.success) {
         parsedOutput = parsed.data;
+        logger.info('Execution output validated', {
+          actor: agent.name,
+          actorId: agent.id,
+          operationKey: input.operationKey,
+        });
       } else {
         validationError = zodErrorToMessage(parsed.error);
+        logger.warn('Execution output failed validation', {
+          actor: agent.name,
+          actorId: agent.id,
+          operationKey: input.operationKey,
+          validationError,
+        });
       }
     }
 
@@ -217,10 +246,96 @@ export class ExecutionsService {
   }
 
   private tryParseJson(rawOutput: string): unknown {
-    try {
-      return JSON.parse(rawOutput);
-    } catch {
-      return rawOutput;
+    const direct = this.tryParseJsonCandidate(rawOutput);
+    if (direct.success) {
+      return direct.value;
     }
+
+    const fenced = this.extractJsonFence(rawOutput);
+    if (fenced) {
+      const parsedFence = this.tryParseJsonCandidate(fenced);
+      if (parsedFence.success) {
+        return parsedFence.value;
+      }
+    }
+
+    const extracted = this.extractFirstJsonValue(rawOutput);
+    if (extracted) {
+      const parsedExtracted = this.tryParseJsonCandidate(extracted);
+      if (parsedExtracted.success) {
+        return parsedExtracted.value;
+      }
+    }
+
+    return rawOutput;
+  }
+
+  private tryParseJsonCandidate(rawOutput: string): { success: false } | { success: true; value: unknown } {
+    try {
+      return { success: true, value: JSON.parse(rawOutput) };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  private extractJsonFence(rawOutput: string): string | null {
+    const match = rawOutput.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (!match) {
+      return null;
+    }
+
+    return match[1]?.trim() || null;
+  }
+
+  private extractFirstJsonValue(rawOutput: string): string | null {
+    const startIndexes = [rawOutput.indexOf('{'), rawOutput.indexOf('[')].filter((index) => index >= 0);
+    if (startIndexes.length === 0) {
+      return null;
+    }
+
+    const start = Math.min(...startIndexes);
+    const opening = rawOutput[start];
+    const closing = opening === '{' ? '}' : ']';
+    let depth = 0;
+    let inString = false;
+    let isEscaped = false;
+
+    for (let index = start; index < rawOutput.length; index += 1) {
+      const character = rawOutput[index];
+
+      if (inString) {
+        if (isEscaped) {
+          isEscaped = false;
+          continue;
+        }
+
+        if (character === '\\') {
+          isEscaped = true;
+          continue;
+        }
+
+        if (character === '"') {
+          inString = false;
+        }
+
+        continue;
+      }
+
+      if (character === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (character === opening) {
+        depth += 1;
+      } else if (character === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          return rawOutput.slice(start, index + 1);
+        }
+      }
+    }
+
+    return null;
   }
 }

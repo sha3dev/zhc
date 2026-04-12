@@ -2,14 +2,10 @@ import { z } from 'zod';
 
 export const taskStatuses = [
   'pending',
-  'assigned',
   'in_progress',
-  'awaiting_review',
-  'changes_requested',
-  'reopened',
+  'waiting',
   'completed',
   'failed',
-  'blocked',
   'cancelled',
 ] as const;
 
@@ -27,9 +23,6 @@ export interface Task {
   id: number;
   lastExecutionId: number | null;
   projectId: number;
-  reopenCount: number;
-  reopenedAt: Date | null;
-  reopenedFromTaskEventId: number | null;
   reviewCycle: number;
   runBlockedReason: string | null;
   sort: number;
@@ -49,9 +42,6 @@ export interface TaskRecord {
   tsk_description: string;
   tsk_has_dependency_risk: boolean;
   tsk_id: number;
-  tsk_reopen_count: number;
-  tsk_reopened_at: Date | null;
-  tsk_reopened_from_tev_id: number | null;
   tsk_review_cycle: number;
   tsk_sort: number;
   tsk_status: TaskStatus;

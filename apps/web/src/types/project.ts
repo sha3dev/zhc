@@ -9,14 +9,10 @@ export type ProjectStatus =
 
 export type TaskStatus =
   | 'pending'
-  | 'assigned'
   | 'in_progress'
-  | 'awaiting_review'
-  | 'changes_requested'
-  | 'reopened'
+  | 'waiting'
   | 'completed'
   | 'failed'
-  | 'blocked'
   | 'cancelled';
 
 export interface ProjectTask {
@@ -31,9 +27,6 @@ export interface ProjectTask {
   id: number;
   lastExecutionId: number | null;
   projectId: number;
-  reopenCount: number;
-  reopenedAt: string | null;
-  reopenedFromTaskEventId: number | null;
   reviewCycle: number;
   runBlockedReason: string | null;
   sort: number;
@@ -73,6 +66,7 @@ export interface ProjectDetails extends ProjectSummary {
 }
 
 export interface TaskThreadEvent {
+  attachments: TaskThreadAttachment[];
   authorAgentId: number;
   authorAgentName: string;
   body: string;
@@ -80,18 +74,25 @@ export interface TaskThreadEvent {
   executionId: number | null;
   id: number;
   kind:
-    | 'assignment'
-    | 'ceo_instruction'
-    | 'agent_reply'
-    | 'submission'
-    | 'approval'
-    | 'changes_requested'
-    | 'reopened'
-    | 'blocked'
-    | 'status_changed'
-    | 'dependency_risk_flagged';
+    | 'run_request'
+    | 'agent_response'
+    | 'ceo_response'
+    | 'human_feedback_request'
+    | 'human_feedback'
+    | 'status_changed';
   metadata: Record<string, unknown> | null;
   taskId: number;
+}
+
+export interface TaskThreadAttachment {
+  id: number;
+  kind: 'project_file' | 'external_url';
+  mediaType: string | null;
+  path: string | null;
+  sizeBytes: number | null;
+  taskEventId: number;
+  title: string;
+  url: string | null;
 }
 
 export interface ListProjectsResponse {

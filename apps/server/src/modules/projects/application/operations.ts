@@ -46,6 +46,8 @@ export const createProjectOperationOutputSchema = z.object({
         key: taskKeySchema,
         sort: z.number().int().min(0),
         title: z.string().trim().min(1).max(500),
+      }).refine((task) => Boolean(task.assignedToAgentId || task.assignedToAgentKey), {
+        message: 'Each task must define assignedToAgentId or assignedToAgentKey',
       }),
     )
     .min(1),

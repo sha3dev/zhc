@@ -169,7 +169,7 @@ export default function ExpertDetail() {
       </div>
 
       {error && (
-        <div className="shrink-0 animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive">
+        <div className="shrink-0 animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">
           {`> error: ${error}`}
         </div>
       )}
@@ -181,7 +181,7 @@ export default function ExpertDetail() {
           <div className="shrink-0">
             <SectionHeader label="EXPERT DETAIL" />
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h1 className="break-words font-mono text-xl font-bold text-foreground sm:text-2xl">
+              <h1 className="break-words font-bold font-mono text-foreground text-xl sm:text-2xl">
                 [xp] {expert.name}
                 <span
                   className="ml-1 animate-cursor-blink text-primary"
@@ -230,7 +230,7 @@ export default function ExpertDetail() {
           </div>
 
           {formError && (
-            <div className="shrink-0 animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive">
+            <div className="shrink-0 animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">
               {`> error: ${formError}`}
             </div>
           )}
@@ -249,7 +249,7 @@ export default function ExpertDetail() {
             <DialogDescription>this action is irreversible.</DialogDescription>
           </DialogHeader>
           <DialogBody className="flex-none">
-            <p className="font-code text-xs text-muted-foreground">
+            <p className="font-code text-muted-foreground text-xs">
               {'> remove '}
               <strong className="text-foreground">{expert?.name}</strong>
               {' from expert registry.'}

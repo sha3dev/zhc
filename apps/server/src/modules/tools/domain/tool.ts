@@ -61,6 +61,7 @@ export const CLI_TOOLS: CliTool[] = [
     command: 'opencode',
     // opencode has built-in models — works without credentials; modelsCommand doubles as auth
     modelsCommand: 'opencode models',
+    knownModels: ['zai-coding-plan/glm-5.1'],
   },
   {
     id: 'kilo',

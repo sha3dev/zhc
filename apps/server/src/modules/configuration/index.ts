@@ -10,6 +10,7 @@ export type {
   DokkuConfiguration,
   EmailConfiguration,
   GithubConfiguration,
+  HumanConfiguration,
   InternalConfiguration,
 } from './domain/configuration.js';
 export { SqlConfigurationRepository } from './infrastructure/sql-configuration.repository.js';

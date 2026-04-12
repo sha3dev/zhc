@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { createAgentsRouter, createExpertsRouter } from '../modules/agents/index.js';
 import { createConfigurationRouter } from '../modules/configuration/index.js';
 import { createExecutionsRouter } from '../modules/executions/index.js';
+import { createFilesRouter } from '../modules/files/http.js';
 import { createMailsRouter } from '../modules/mails/index.js';
 import { createModelsRouter } from '../modules/models/index.js';
 import { createProjectsRouter } from '../modules/projects/index.js';
@@ -25,6 +26,7 @@ export function createHttpApp(context: AppContext): Hono {
     }),
   );
 
+  app.route('/api/files', createFilesRouter());
   app.route('/api/agents', createAgentsRouter(context.agents));
   app.route('/api/experts', createExpertsRouter(context.experts));
   app.route('/api/configuration', createConfigurationRouter(context.configuration));

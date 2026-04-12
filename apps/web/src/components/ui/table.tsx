@@ -6,7 +6,7 @@ const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableE
     <div className="w-full overflow-auto">
       <table
         ref={ref}
-        className={cn('w-full caption-bottom text-xs font-mono', className)}
+        className={cn('w-full caption-bottom font-mono text-xs', className)}
         {...props}
       />
     </div>
@@ -18,7 +18,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('border-b border-border', className)} {...props} />
+  <thead ref={ref} className={cn('border-border border-b', className)} {...props} />
 ));
 TableHeader.displayName = 'TableHeader';
 
@@ -35,9 +35,9 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
     <tr
       ref={ref}
       className={cn(
-        'border-b border-border',
+        'border-border border-b',
         'transition-all duration-150',
-        'hover:bg-muted/40 cursor-pointer',
+        'cursor-pointer hover:bg-muted/40',
         'data-[state=selected]:bg-muted',
         className,
       )}
@@ -55,7 +55,7 @@ const TableHead = React.forwardRef<
     ref={ref}
     className={cn(
       'h-8 px-3 text-left align-middle',
-      'font-code text-2xs uppercase tracking-widest text-muted-foreground',
+      'font-code text-2xs text-muted-foreground uppercase tracking-widest',
       '[&:has([role=checkbox])]:pr-0',
       className,
     )}
@@ -80,7 +80,7 @@ const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
   React.HTMLAttributes<HTMLTableCaptionElement>
 >(({ className, ...props }, ref) => (
-  <caption ref={ref} className={cn('mt-4 text-xs text-muted-foreground', className)} {...props} />
+  <caption ref={ref} className={cn('mt-4 text-muted-foreground text-xs', className)} {...props} />
 ));
 TableCaption.displayName = 'TableCaption';
 

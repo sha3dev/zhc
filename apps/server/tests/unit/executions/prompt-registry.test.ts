@@ -15,6 +15,8 @@ describe('FileSystemPromptRegistry', () => {
   it('fails to load an unknown fragment', async () => {
     const registry = new FileSystemPromptRegistry();
 
-    await expect(registry.getFragment('missing')).rejects.toThrow(/Prompt fragment missing not found/);
+    await expect(registry.getFragment('missing')).rejects.toThrow(
+      /Prompt fragment missing not found/,
+    );
   });
 });

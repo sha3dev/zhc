@@ -11,7 +11,8 @@ const NAV_ITEMS = [
   { to: '/experts', label: 'experts', index: '04' },
   { to: '/executions', label: 'executions', index: '05' },
   { to: '/mails', label: 'mails', index: '06' },
-  { to: '/settings', label: 'settings', index: '07' },
+  { to: '/files', label: 'files', index: '07' },
+  { to: '/settings', label: 'settings', index: '08' },
 ];
 
 interface ListTasksResponse {

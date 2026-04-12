@@ -42,14 +42,9 @@ function getTaskStatusVariant(status: TaskStatus) {
   switch (status) {
     case 'completed':
       return 'success' as const;
-    case 'assigned':
     case 'in_progress':
-    case 'awaiting_review':
-    case 'reopened':
+    case 'waiting':
       return 'info' as const;
-    case 'blocked':
-    case 'changes_requested':
-      return 'warning' as const;
     case 'failed':
     case 'cancelled':
       return 'destructive' as const;
@@ -321,22 +316,16 @@ export default function ProjectDetail() {
                               {task.hasDependencyRisk ? (
                                 <Badge variant="warning">at risk</Badge>
                               ) : null}
-                              {task.status === 'reopened' ? (
-                                <Badge variant="destructive">reopened</Badge>
-                              ) : null}
                             </div>
                             <div className="flex flex-wrap gap-x-4 gap-y-1 font-code text-2xs text-muted-foreground">
                               <span>
                                 assignee{' '}
                                 <span className="text-foreground">
-                                  {task.assignedToAgentName ?? 'unassigned'}
+                                  {task.assignedToAgentName ?? 'missing actor'}
                                 </span>
                               </span>
                               <span>
                                 cycle <span className="text-foreground">{task.reviewCycle}</span>
-                              </span>
-                              <span>
-                                reopens <span className="text-foreground">{task.reopenCount}</span>
                               </span>
                               <span>
                                 task_id <span className="text-foreground">#{task.id}</span>
@@ -412,7 +401,7 @@ export default function ProjectDetail() {
               <p className="font-mono text-foreground text-sm">{confirmRunTask?.title ?? '—'}</p>
               <p className="mono-label">agent</p>
               <p className="font-mono text-foreground text-sm">
-                {confirmRunTask?.assignedToAgentName ?? 'unassigned'}
+                {confirmRunTask?.assignedToAgentName ?? 'missing actor'}
               </p>
               <p className="mono-label">sandbox</p>
               <p className="font-mono text-foreground text-sm">workspace-write</p>

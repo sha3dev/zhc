@@ -4,6 +4,7 @@ import {
   getPrimaryKeyColumn,
   getTimestampColumn,
 } from '../../../shared/db/naming.js';
+import { ValidationError } from '../../../shared/errors/app-error.js';
 import type { CreateTaskInput, ListTasksQuery, TasksRepository } from '../application/contracts.js';
 import type { Task, TaskDependencyRecord, TaskRecord } from '../domain/task.js';
 import { toTask } from './mappers.js';
@@ -22,9 +23,6 @@ export class SqlTasksRepository implements TasksRepository {
     lastExecutionId: 'exe_id',
     projectId: 'prj_id',
     completedAt: getColumnName(this.tableName, 'completed_at'),
-    reopenCount: getColumnName(this.tableName, 'reopen_count'),
-    reopenedAt: getColumnName(this.tableName, 'reopened_at'),
-    reopenedFromTaskEventId: getColumnName(this.tableName, 'reopened_from_tev_id'),
     reviewCycle: getColumnName(this.tableName, 'review_cycle'),
     sort: getColumnName(this.tableName, 'sort'),
     status: getColumnName(this.tableName, 'status'),
@@ -52,12 +50,14 @@ export class SqlTasksRepository implements TasksRepository {
 
   async assign(taskId: number, agentId: number): Promise<Task | null> {
     const actor = await this.resolveActorColumns(agentId);
+    if (!actor.agentId && !actor.expertId) {
+      throw new ValidationError(`Actor ${agentId} does not exist`);
+    }
     const result = await query<{ tsk_id: number }>(
       `
         UPDATE ${this.tableName}
         SET ${this.columns.assignedToAgentId} = $1,
             ${this.columns.assignedToExpertId} = $2,
-            ${this.columns.status} = 'assigned',
             ${this.columns.updatedAt} = CURRENT_TIMESTAMP
         WHERE ${this.columns.id} = $3
         RETURNING ${this.columns.id}
@@ -93,10 +93,10 @@ export class SqlTasksRepository implements TasksRepository {
   }
 
   async create(input: CreateTaskInput): Promise<Task> {
-    const actor = input.assignedToAgentId
-      ? await this.resolveActorColumns(input.assignedToAgentId)
-      : { agentId: null, expertId: null };
-    const initialStatus = input.assignedToAgentId ? 'assigned' : 'pending';
+    const actor = await this.resolveActorColumns(input.assignedToAgentId);
+    if (!actor.agentId && !actor.expertId) {
+      throw new ValidationError(`Actor ${input.assignedToAgentId} does not exist`);
+    }
     const result = await query<{ tsk_id: number }>(
       `
         INSERT INTO ${this.tableName} (
@@ -117,7 +117,7 @@ export class SqlTasksRepository implements TasksRepository {
         input.title,
         input.description,
         input.sort,
-        initialStatus,
+        'pending',
       ],
     );
 
@@ -313,9 +313,6 @@ export class SqlTasksRepository implements TasksRepository {
       completedAt?: Date | null;
       hasDependencyRisk?: boolean;
       lastExecutionId?: number | null;
-      reopenedAt?: Date | null;
-      reopenedFromTaskEventId?: number | null;
-      reopenCount?: number;
       reviewCycle?: number;
       status?: Task['status'];
     },
@@ -334,24 +331,9 @@ export class SqlTasksRepository implements TasksRepository {
       params.push(input.reviewCycle);
     }
 
-    if (input.reopenCount !== undefined) {
-      updates.push(`${this.columns.reopenCount} = $${index++}`);
-      params.push(input.reopenCount);
-    }
-
-    if (input.reopenedAt !== undefined) {
-      updates.push(`${this.columns.reopenedAt} = $${index++}`);
-      params.push(input.reopenedAt);
-    }
-
     if (input.completedAt !== undefined) {
       updates.push(`${this.columns.completedAt} = $${index++}`);
       params.push(input.completedAt);
-    }
-
-    if (input.reopenedFromTaskEventId !== undefined) {
-      updates.push(`${this.columns.reopenedFromTaskEventId} = $${index++}`);
-      params.push(input.reopenedFromTaskEventId);
     }
 
     if (input.hasDependencyRisk !== undefined) {

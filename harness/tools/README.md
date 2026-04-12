@@ -16,6 +16,15 @@ Install browsers when needed:
 npm run harness:browser:install
 ```
 
+## Steel Browser
+
+```bash
+npm run harness:steel-browser -- --actions '[{"type":"goto","url":"https://www.google.com/search?q=crossfit+box+design"},{"type":"screenshot","name":"results","fullPage":true}]' --persist-profile --namespace research
+npm run harness:steel-browser -- --script tmp/steel-browser/check.mjs --input '{"url":"https://x.com"}'
+```
+
+Requires `DATABASE_URL` and a configured Steel API key in Settings.
+
 ## HTTP
 
 ```bash

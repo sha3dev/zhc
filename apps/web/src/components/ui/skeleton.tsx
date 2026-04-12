@@ -12,7 +12,7 @@ export function Skeleton({ className, ...props }: SkeletonProps) {
 /** Full stat card skeleton */
 export function StatCardSkeleton() {
   return (
-    <div className="border border-border bg-card p-4 space-y-3">
+    <div className="space-y-3 border border-border bg-card p-4">
       <Skeleton className="h-2.5 w-20" />
       <Skeleton className="h-9 w-12" />
       <Skeleton className="h-2 w-14" />
@@ -37,7 +37,7 @@ export function ModelRowSkeleton({ width }: { width: string }) {
 export function TableRowSkeleton({ cols = 4 }: { cols?: number }) {
   const widths = ['w-32', 'w-40', 'w-16', 'w-24'];
   return (
-    <tr className="border-b border-border">
+    <tr className="border-border border-b">
       {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-3 py-2.5">
           <Skeleton className={`h-2.5 ${widths[i] ?? 'w-20'}`} />

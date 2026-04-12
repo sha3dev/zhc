@@ -1,18 +1,23 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { idParamSchema, parseJson, parseParams, parseQuery } from '../../../shared/http/parse.js';
 import {
   listTasksQuerySchema,
+  taskDenyInputSchema,
+  taskFeedbackInputSchema,
+  taskHumanFeedbackRequestInputSchema,
   taskApproveInputSchema,
-  taskDispatchInputSchema,
-  taskReopenInputSchema,
-  taskReplyInputSchema,
-  taskRequestChangesInputSchema,
+  taskRunInputSchema,
   updateTaskStatusInputSchema,
 } from '../application/contracts.js';
 import type { TasksService } from '../application/service.js';
 
 export function createTasksRouter(service: TasksService): Hono {
   const router = new Hono();
+  const attachmentParamsSchema = z.object({
+    attachmentId: z.coerce.number().int().positive(),
+    id: z.coerce.number().int().positive(),
+  });
 
   router.get('/', async (context) => {
     const query = parseQuery(context, listTasksQuerySchema);
@@ -37,22 +42,18 @@ export function createTasksRouter(service: TasksService): Hono {
     return context.json(await service.getThread(id));
   });
 
+  router.get('/:id/attachments/:attachmentId/content', async (context) => {
+    const { attachmentId, id } = parseParams(context, attachmentParamsSchema);
+    const file = await service.getAttachmentContent(id, attachmentId);
+    context.header('Content-Disposition', file.contentDisposition);
+    context.header('Content-Type', file.contentType);
+    return context.body(file.content);
+  });
+
   router.post('/:id/run', async (context) => {
     const { id } = parseParams(context, idParamSchema);
-    const payload = await parseJson(context, taskDispatchInputSchema);
+    const payload = await parseJson(context, taskRunInputSchema);
     return context.json(await service.run(id, payload));
-  });
-
-  router.post('/:id/dispatch', async (context) => {
-    const { id } = parseParams(context, idParamSchema);
-    const payload = await parseJson(context, taskDispatchInputSchema);
-    return context.json(await service.run(id, payload));
-  });
-
-  router.post('/:id/reply', async (context) => {
-    const { id } = parseParams(context, idParamSchema);
-    const payload = await parseJson(context, taskReplyInputSchema);
-    return context.json(await service.reply(id, payload));
   });
 
   router.post('/:id/approve', async (context) => {
@@ -61,16 +62,22 @@ export function createTasksRouter(service: TasksService): Hono {
     return context.json(await service.approve(id, payload));
   });
 
-  router.post('/:id/request-changes', async (context) => {
+  router.post('/:id/feedback', async (context) => {
     const { id } = parseParams(context, idParamSchema);
-    const payload = await parseJson(context, taskRequestChangesInputSchema);
-    return context.json(await service.requestChanges(id, payload));
+    const payload = await parseJson(context, taskFeedbackInputSchema);
+    return context.json(await service.provideFeedback(id, payload));
   });
 
-  router.post('/:id/reopen', async (context) => {
+  router.post('/:id/deny', async (context) => {
     const { id } = parseParams(context, idParamSchema);
-    const payload = await parseJson(context, taskReopenInputSchema);
-    return context.json(await service.reopen(id, payload));
+    const payload = await parseJson(context, taskDenyInputSchema);
+    return context.json(await service.deny(id, payload));
+  });
+
+  router.post('/:id/human-feedback-request', async (context) => {
+    const { id } = parseParams(context, idParamSchema);
+    const payload = await parseJson(context, taskHumanFeedbackRequestInputSchema);
+    return context.json(await service.requestHumanFeedback(id, payload));
   });
 
   router.patch('/:id/status', async (context) => {

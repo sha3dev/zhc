@@ -2,7 +2,10 @@
   "name": "zhc",
   "private": true,
   "type": "module",
-  "workspaces": ["apps/server", "apps/web"],
+  "workspaces": [
+    "apps/server",
+    "apps/web"
+  ],
   "scripts": {
     "dev": "npm run dev -w @zhc/server",
     "build": "npm run build -w @zhc/web && npm run build -w @zhc/server",
@@ -15,6 +18,7 @@
     "harness:email": "node harness/tools/email.mjs",
     "harness:http": "node harness/tools/http.mjs",
     "harness:postgres": "node harness/tools/postgres.mjs",
+    "harness:steel-browser": "node harness/tools/steel-browser.mjs",
     "lint": "biome check .",
     "typecheck": "npm run typecheck -w @zhc/web && npm run typecheck -w @zhc/server",
     "test": "npm run test -w @zhc/server",
@@ -32,5 +36,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "playwright": "1.59.1"
+  },
+  "dependencies": {
+    "steel-sdk": "0.18.0"
   }
 }

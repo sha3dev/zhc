@@ -37,6 +37,12 @@ function createInternalConfiguration(
       installationId: null,
       privateKey: { value: null },
     },
+    human: {
+      email: null,
+    },
+    steel: {
+      apiKey: { value: null },
+    },
     id: 1,
   };
 }

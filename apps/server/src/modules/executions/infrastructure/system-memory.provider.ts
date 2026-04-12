@@ -6,18 +6,27 @@ interface AgentMemoryReader {
   listForMemory(): Promise<RegistryEntityMemorySummary[]>;
 }
 
-function serializeAvailableAgents(agents: RegistryEntityMemorySummary[]): string {
+function serializeAvailableAgents(
+  agents: RegistryEntityMemorySummary[],
+  mode: 'compact' | 'full' = 'full',
+): string {
   return JSON.stringify(
     agents.map((agent) => ({
       id: agent.id,
       isCeo: agent.isCeo,
       kind: agent.kind,
       key: agent.key,
-      modelCliId: agent.modelCliId,
-      model: agent.model,
       name: agent.name,
-      role: agent.role,
-      status: agent.status,
+      ...(mode === 'full'
+        ? {
+            modelCliId: agent.modelCliId,
+            model: agent.model,
+            role: agent.role,
+            status: agent.status,
+          }
+        : {
+            role: agent.role,
+          }),
     })),
     null,
     2,
@@ -27,16 +36,20 @@ function serializeAvailableAgents(agents: RegistryEntityMemorySummary[]): string
 export class SystemMemoryProvider implements MemoryProvider {
   constructor(private readonly agents: AgentMemoryReader) {}
 
-  async build(_input: MemoryBuildInput, memoryKeys: string[]): Promise<MemoryBlock[]> {
+  async build(input: MemoryBuildInput, memoryKeys: string[]): Promise<MemoryBlock[]> {
     const blocks: MemoryBlock[] = [];
     const requestedAgentMemory =
       memoryKeys.includes('available_agents') || memoryKeys.includes('available_experts');
     const agents = requestedAgentMemory ? await this.agents.listForMemory() : [];
+    const mode = input.operationKey === 'create-project' ? 'compact' : 'full';
 
     for (const memoryKey of memoryKeys) {
       if (memoryKey === 'available_agents') {
         blocks.push({
-          content: serializeAvailableAgents(agents.filter((agent) => agent.kind !== 'expert')),
+          content: serializeAvailableAgents(
+            agents.filter((agent) => agent.kind !== 'expert'),
+            mode,
+          ),
           key: memoryKey,
           kind: 'memory',
           source: 'dynamic',
@@ -46,7 +59,10 @@ export class SystemMemoryProvider implements MemoryProvider {
 
       if (memoryKey === 'available_experts') {
         blocks.push({
-          content: serializeAvailableAgents(agents.filter((agent) => agent.kind === 'expert')),
+          content: serializeAvailableAgents(
+            agents.filter((agent) => agent.kind === 'expert'),
+            mode,
+          ),
           key: memoryKey,
           kind: 'memory',
           source: 'dynamic',

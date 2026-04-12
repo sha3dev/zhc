@@ -21,6 +21,7 @@ import {
   Container,
   Gem,
   Github,
+  Globe,
   Mail,
   Orbit,
   RefreshCw,
@@ -408,6 +409,18 @@ const SECTIONS: SettingsSection[] = [
     icon: <Mail className="h-4 w-4" />,
     description: 'Resend polling + transport',
   },
+  {
+    id: 'human',
+    label: 'human',
+    icon: <Mail className="h-4 w-4" />,
+    description: 'Fallback human escalation target',
+  },
+  {
+    id: 'steel',
+    label: 'steel',
+    icon: <Globe className="h-4 w-4" />,
+    description: 'Cloud browser runtime for agents',
+  },
 ];
 
 export default function Settings() {
@@ -443,6 +456,10 @@ export default function Settings() {
   const [resendApiKey, setResendApiKey] = useState('');
   const [resendApiKeyConfigured, setResendApiKeyConfigured] = useState(false);
   const [resendApiKeyDirty, setResendApiKeyDirty] = useState(false);
+  const [humanEmail, setHumanEmail] = useState('');
+  const [steelApiKey, setSteelApiKey] = useState('');
+  const [steelApiKeyConfigured, setSteelApiKeyConfigured] = useState(false);
+  const [steelApiKeyDirty, setSteelApiKeyDirty] = useState(false);
 
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -472,6 +489,10 @@ export default function Settings() {
         setResendApiKey('');
         setResendApiKeyConfigured(config.email.resendApiKey.configured);
         setResendApiKeyDirty(false);
+        setHumanEmail(config.human.email ?? '');
+        setSteelApiKey('');
+        setSteelApiKeyConfigured(config.steel.apiKey.configured);
+        setSteelApiKeyDirty(false);
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : 'Unable to load configuration.');
       } finally {
@@ -506,6 +527,12 @@ export default function Settings() {
           ...(ghClientSecretDirty ? { clientSecret: ghClientSecret } : {}),
           ...(ghPrivateKeyDirty ? { privateKey: ghPrivateKey } : {}),
         },
+        human: {
+          email: humanEmail.trim() || null,
+        },
+        steel: {
+          ...(steelApiKeyDirty ? { apiKey: steelApiKey } : {}),
+        },
       };
 
       const config = await fetchJson<ConfigurationResponse>('/configuration', {
@@ -516,12 +543,15 @@ export default function Settings() {
       setGhClientSecret('');
       setGhPrivateKey('');
       setResendApiKey('');
+      setSteelApiKey('');
       setGhClientSecretConfigured(config.github.clientSecret.configured);
       setGhPrivateKeyConfigured(config.github.privateKey.configured);
       setResendApiKeyConfigured(config.email.resendApiKey.configured);
+      setSteelApiKeyConfigured(config.steel.apiKey.configured);
       setGhClientSecretDirty(false);
       setGhPrivateKeyDirty(false);
       setResendApiKeyDirty(false);
+      setSteelApiKeyDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -811,6 +841,55 @@ export default function Settings() {
             <div className="border border-border/50 bg-muted/30 px-3 py-2.5">
               <p className="font-code text-2xs text-muted-foreground">
                 {'> polling uses the server process; no webhook is required in v1'}
+              </p>
+            </div>
+          </SectionCard>
+
+          <SectionCard section={SECTIONS[3]} active={activeSection === 'human'}>
+            <FieldGroup>
+              <Field
+                id="human-email"
+                label="human.email"
+                hint="Destination used when the CEO escalates to the human"
+                fullWidth
+              >
+                <Input
+                  id="human-email"
+                  value={humanEmail}
+                  onChange={(e) => setHumanEmail(e.target.value)}
+                  placeholder="human@example.com"
+                  className="font-mono text-xs"
+                />
+              </Field>
+            </FieldGroup>
+          </SectionCard>
+
+          <SectionCard section={SECTIONS[4]} active={activeSection === 'steel'}>
+            <FieldGroup>
+              <Field
+                id="steel-api-key"
+                label="steel.api_key"
+                hint="API key for Steel cloud browser sessions"
+                fullWidth
+              >
+                <Input
+                  id="steel-api-key"
+                  type="password"
+                  value={steelApiKey}
+                  onChange={(e) => {
+                    setSteelApiKeyDirty(true);
+                    setSteelApiKey(e.target.value);
+                  }}
+                  placeholder={steelApiKeyConfigured ? 'configured' : 'stl_...'}
+                  className="font-mono text-xs"
+                />
+              </Field>
+            </FieldGroup>
+            <div className="border border-border/50 bg-muted/30 px-3 py-2.5">
+              <p className="font-code text-2xs text-muted-foreground">
+                {
+                  '> enables remote browsing, screenshots, persistent profiles, and authenticated sessions through Steel'
+                }
               </p>
             </div>
           </SectionCard>

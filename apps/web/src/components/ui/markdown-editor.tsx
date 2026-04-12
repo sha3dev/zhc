@@ -186,9 +186,9 @@ export function MarkdownEditor({
       className={cn(
         'w-full border border-input bg-background',
         'transition-all duration-200',
-        'focus-within:ring-1 focus-within:ring-ring focus-within:border-ring',
+        'focus-within:border-ring focus-within:ring-1 focus-within:ring-ring',
         fill
-          ? 'flex-1 min-h-0 [&_.cm-editor]:h-full [&_.cm-scroller]:h-full [&_.cm-content]:min-h-full'
+          ? 'min-h-0 flex-1 [&_.cm-content]:min-h-full [&_.cm-editor]:h-full [&_.cm-scroller]:h-full'
           : '[&_.cm-editor]:min-h-[inherit] [&_.cm-scroller]:min-h-[inherit]',
         className,
       )}

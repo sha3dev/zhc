@@ -1,4 +1,5 @@
 import { createProjectOperationOutputSchema } from '../../projects/application/operations.js';
+import { taskAgentResponseSchema } from '../../tasks/application/contracts.js';
 import type { ExecutionOperationDefinition } from './contracts.js';
 
 export const EXECUTION_OPERATIONS: Record<string, ExecutionOperationDefinition> = {
@@ -7,6 +8,7 @@ export const EXECUTION_OPERATIONS: Record<string, ExecutionOperationDefinition> 
     operationKey: 'create-project',
     outputSchema: createProjectOperationOutputSchema,
     staticFragments: [],
+    timeoutMs: 600_000,
   },
   'create-expert-draft': {
     memoryKeys: ['available_experts'],
@@ -15,7 +17,9 @@ export const EXECUTION_OPERATIONS: Record<string, ExecutionOperationDefinition> 
   },
   'execute-task': {
     operationKey: 'execute-task',
-    skillKeys: ['playwright-browser', 'dokku', 'postgres', 'http-client', 'email'],
+    outputSchema: taskAgentResponseSchema,
+    skillKeys: ['playwright-browser', 'steel-browser', 'dokku', 'postgres', 'http-client', 'email'],
     staticFragments: [],
+    timeoutMs: 900_000,
   },
 };

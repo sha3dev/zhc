@@ -29,6 +29,12 @@ function createInternalConfiguration(): InternalConfiguration {
       installationId: '456',
       privateKey: { value: 'pem' },
     },
+    human: {
+      email: 'human@example.com',
+    },
+    steel: {
+      apiKey: { value: 'stl_secret' },
+    },
     id: 1,
   };
 }
@@ -50,6 +56,7 @@ describe('ConfigurationService', () => {
     expect(result.github.clientSecret).toEqual({ configured: true });
     expect(result.github.privateKey).toEqual({ configured: true });
     expect(result.email.resendApiKey).toEqual({ configured: true });
+    expect(result.steel.apiKey).toEqual({ configured: true });
   });
 
   it('preserves internal configuration access for background services', async () => {
@@ -61,5 +68,6 @@ describe('ConfigurationService', () => {
 
     expect(result.email.resendApiKey.value).toBe('re_secret');
     expect(result.github.clientSecret.value).toBe('secret');
+    expect(result.steel.apiKey.value).toBe('stl_secret');
   });
 });

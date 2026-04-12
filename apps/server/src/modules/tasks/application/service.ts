@@ -1,15 +1,22 @@
+import { readFile, stat } from 'node:fs/promises';
+import { basename, extname, resolve } from 'node:path';
 import { NotFoundError, ValidationError } from '../../../shared/errors/app-error.js';
+import { logger } from '../../../shared/observability/logger.js';
+import type { ConfigurationReader } from '../../configuration/index.js';
 import type { ExecutionResult } from '../../executions/domain/execution.js';
+import type { SendEmailInput } from '../../mails/application/contracts.js';
 import type { TaskEvent } from '../domain/task-event.js';
 import type { Task } from '../domain/task.js';
 import type {
   CreateTaskInput,
+  TaskAgentResponse,
   TaskApproveInput,
-  TaskDispatchInput,
+  TaskDenyInput,
   TaskEventsRepository,
-  TaskReopenInput,
-  TaskReplyInput,
-  TaskRequestChangesInput,
+  TaskFeedbackInput,
+  TaskHumanFeedbackRequestInput,
+  TaskEventAttachmentInput,
+  TaskRunInput,
   TasksRepository,
 } from './contracts.js';
 
@@ -37,7 +44,11 @@ interface TaskExecutionRunner {
     sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
     userInput: string;
     workingDirectory?: string;
-  }): Promise<ExecutionResult<unknown>>;
+  }): Promise<ExecutionResult<TaskAgentResponse>>;
+}
+
+interface TaskEmailSender {
+  send(input: SendEmailInput): Promise<unknown>;
 }
 
 type TaskRunState = {
@@ -45,18 +56,7 @@ type TaskRunState = {
   runBlockedReason: string | null;
 };
 
-const RUNNABLE_TASK_STATUSES = new Set<Task['status']>([
-  'pending',
-  'assigned',
-  'in_progress',
-  'changes_requested',
-  'reopened',
-  'failed',
-]);
-
-function canParticipate(task: Task, authorAgentId: number, isCeo: boolean): boolean {
-  return isCeo || task.assignedToAgentId === authorAgentId;
-}
+const RUNNABLE_TASK_STATUSES = new Set<Task['status']>(['pending', 'failed']);
 
 function buildTreePath(taskId: number, tasks: Task[]): number[] {
   const taskById = new Map(tasks.map((task) => [task.id, task]));
@@ -82,11 +82,11 @@ function buildTreePath(taskId: number, tasks: Task[]): number[] {
   return Array.from(path);
 }
 
-function defaultDispatchInstruction(task: Task): string {
+function defaultRunInstruction(task: Task): string {
   return [
-    `Execute task: ${task.title}.`,
-    'Use the task brief and current thread context to determine the next concrete implementation step.',
-    'Advance the work, report what changed, and hand back a concise review summary for the CEO.',
+    `Run task: ${task.title}.`,
+    'Use the task brief, project context, and thread history as the source of truth.',
+    'Return a structured agent response with either a CEO feedback request or a CEO approval request.',
   ].join(' ');
 }
 
@@ -98,11 +98,37 @@ function errorToMessage(error: unknown): string {
   return String(error);
 }
 
+function guessMediaType(path: string): string {
+  switch (extname(path).toLowerCase()) {
+    case '.gif':
+      return 'image/gif';
+    case '.jpeg':
+    case '.jpg':
+      return 'image/jpeg';
+    case '.json':
+      return 'application/json; charset=utf-8';
+    case '.md':
+      return 'text/markdown; charset=utf-8';
+    case '.pdf':
+      return 'application/pdf';
+    case '.png':
+      return 'image/png';
+    case '.svg':
+      return 'image/svg+xml';
+    case '.txt':
+      return 'text/plain; charset=utf-8';
+    case '.webp':
+      return 'image/webp';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
 function getTaskRunState(task: Task, dependenciesCompleted: boolean): TaskRunState {
   if (!task.assignedToAgentId) {
     return {
       canRun: false,
-      runBlockedReason: 'Task must be assigned before it can run.',
+      runBlockedReason: 'Task must have an assigned agent or expert.',
     };
   }
 
@@ -133,6 +159,8 @@ export class TasksService {
     private readonly agents?: AgentLookup,
     private readonly projects?: ProjectLookup,
     private readonly executions?: TaskExecutionRunner,
+    private readonly configuration?: ConfigurationReader,
+    private readonly emails?: TaskEmailSender,
   ) {}
 
   assign(taskId: number, agentId: number): Promise<Task | null> {
@@ -145,7 +173,6 @@ export class TasksService {
 
   async getById(id: number): Promise<Task> {
     const task = await this.getRawTaskById(id);
-
     return this.decorateTask(task);
   }
 
@@ -153,6 +180,44 @@ export class TasksService {
     await this.getById(taskId);
     this.ensureWorkflowDependencies();
     return this.events!.findByTaskId(taskId);
+  }
+
+  async getAttachmentContent(taskId: number, attachmentId: number): Promise<{
+    content: Buffer;
+    contentDisposition: string;
+    contentType: string;
+  }> {
+    await this.getById(taskId);
+    this.ensureWorkflowDependencies();
+
+    const task = await this.getRawTaskById(taskId);
+    const attachment = await this.events!.findAttachment(taskId, attachmentId);
+
+    if (!attachment) {
+      throw new NotFoundError(`Attachment ${attachmentId} not found for task ${taskId}`);
+    }
+
+    if (attachment.kind !== 'project_file' || !attachment.path) {
+      throw new ValidationError('Only project_file attachments can be streamed from the API');
+    }
+
+    const project = await this.projects!.getById(task.projectId);
+    const absolutePath = resolve(project.workingDirectory, attachment.path);
+
+    if (!absolutePath.startsWith(project.workingDirectory)) {
+      throw new ValidationError(`Unsafe attachment path: ${attachment.path}`);
+    }
+
+    const fileStat = await stat(absolutePath);
+    if (!fileStat.isFile()) {
+      throw new NotFoundError(`Attachment file does not exist: ${attachment.path}`);
+    }
+
+    return {
+      content: await readFile(absolutePath),
+      contentDisposition: `inline; filename="${basename(attachment.path)}"`,
+      contentType: attachment.mediaType ?? guessMediaType(attachment.path),
+    };
   }
 
   async list(
@@ -194,9 +259,9 @@ export class TasksService {
 
   async run(
     taskId: number,
-    input: TaskDispatchInput,
+    input: TaskRunInput,
   ): Promise<{
-    execution: ExecutionResult<unknown>;
+    execution: ExecutionResult<TaskAgentResponse>;
     task: Task;
     thread: TaskEvent[];
   }> {
@@ -207,82 +272,166 @@ export class TasksService {
     if (!author.isCeo) {
       throw new ValidationError('Only the CEO can run a task');
     }
+    logger.info('Task run requested', {
+      author: author.name,
+      taskId,
+      taskStatus: task.status,
+      title: task.title,
+    });
 
-    const assignedAgentId = input.agentId ?? task.assignedToAgentId;
-    if (!assignedAgentId) {
-      throw new ValidationError(`Task ${taskId} has no assigned agent`);
-    }
-
-    const instruction = input.instruction?.trim() || defaultDispatchInstruction(task);
+    const instruction = input.instruction?.trim() || defaultRunInstruction(task);
     return this.executeTaskCycle(task, {
-      assignedAgentId,
       authorAgentId: author.id,
+      instruction,
+      runRequestMetadata: {
+        reviewCycle: task.reviewCycle,
+        statusBeforeRun: task.status,
+      },
       sandboxMode: input.sandboxMode,
       statusBeforeRun: task.status,
-      instruction,
       workingDirectory: input.workingDirectory,
     });
   }
 
-  async reply(taskId: number, input: TaskReplyInput): Promise<{ task: Task; thread: TaskEvent[] }> {
+  async provideFeedback(
+    taskId: number,
+    input: TaskFeedbackInput,
+  ): Promise<{
+    execution: ExecutionResult<TaskAgentResponse>;
+    task: Task;
+    thread: TaskEvent[];
+  }> {
     this.ensureWorkflowDependencies();
     const task = await this.getRawTaskById(taskId);
-    const author = await this.agents!.getById(input.authorAgentId);
+    const author = await this.requireCeo(input.authorAgentId, 'provide feedback');
+    logger.info('CEO feedback requested rerun', {
+      author: author.name,
+      taskId,
+      taskStatus: task.status,
+      title: task.title,
+    });
 
-    if (!canParticipate(task, author.id, author.isCeo)) {
-      throw new ValidationError('Only the CEO or assigned agent can reply on this task thread');
+    if (task.status !== 'waiting') {
+      throw new ValidationError('CEO feedback is only available while the task is waiting');
     }
 
-    const eventKind = author.isCeo ? 'ceo_instruction' : 'agent_reply';
+    const nextReviewCycle = task.reviewCycle + 1;
+    const updated =
+      (await this.repository.update(taskId, {
+        completedAt: null,
+        hasDependencyRisk: false,
+        reviewCycle: nextReviewCycle,
+        status: 'pending',
+      })) ?? task;
+
     await this.events!.create({
+      attachments: await this.prepareAttachments(task.projectId, input.attachments),
       authorAgentId: author.id,
       body: input.body,
-      kind: eventKind,
-      metadata: { reviewCycle: task.reviewCycle },
+      kind: 'ceo_response',
+      metadata: {
+        responseType: 'feedback',
+        reviewCycle: nextReviewCycle,
+      },
       taskId,
     });
 
-    let nextTask = task;
-    if (input.markAsSubmission) {
-      await this.events!.create({
-        authorAgentId: author.id,
-        body: 'Submitted work for CEO review.',
-        kind: 'submission',
-        metadata: { manual: true, reviewCycle: task.reviewCycle },
-        taskId,
-      });
-      nextTask = (await this.repository.update(taskId, { status: 'awaiting_review' })) ?? task;
+    return this.executeTaskCycle(updated, {
+      authorAgentId: author.id,
+      instruction: input.body,
+      runRequestMetadata: {
+        reviewCycle: nextReviewCycle,
+        trigger: 'ceo_feedback',
+      },
+      sandboxMode: input.sandboxMode,
+      statusBeforeRun: task.status,
+      workingDirectory: input.workingDirectory,
+    });
+  }
+
+  async deny(
+    taskId: number,
+    input: TaskDenyInput,
+  ): Promise<{
+    execution: ExecutionResult<TaskAgentResponse>;
+    task: Task;
+    thread: TaskEvent[];
+  }> {
+    this.ensureWorkflowDependencies();
+    const task = await this.getRawTaskById(taskId);
+    const author = await this.requireCeo(input.authorAgentId, 'deny a task');
+    logger.warn('CEO denied task output', {
+      author: author.name,
+      taskId,
+      taskStatus: task.status,
+      title: task.title,
+    });
+
+    if (task.status !== 'waiting') {
+      throw new ValidationError('CEO denial is only available while the task is waiting');
     }
 
-    return {
-      task: await this.decorateTask(nextTask),
-      thread: await this.events!.findByTaskId(taskId),
-    };
+    const nextReviewCycle = task.reviewCycle + 1;
+    const updated =
+      (await this.repository.update(taskId, {
+        completedAt: null,
+        hasDependencyRisk: false,
+        reviewCycle: nextReviewCycle,
+        status: 'pending',
+      })) ?? task;
+
+    await this.events!.create({
+      attachments: await this.prepareAttachments(task.projectId, input.attachments),
+      authorAgentId: author.id,
+      body: input.body,
+      kind: 'ceo_response',
+      metadata: {
+        responseType: 'denied',
+        reviewCycle: nextReviewCycle,
+      },
+      taskId,
+    });
+
+    return this.executeTaskCycle(updated, {
+      authorAgentId: author.id,
+      instruction: input.body,
+      runRequestMetadata: {
+        reviewCycle: nextReviewCycle,
+        trigger: 'ceo_denied',
+      },
+      sandboxMode: input.sandboxMode,
+      statusBeforeRun: task.status,
+      workingDirectory: input.workingDirectory,
+    });
   }
 
   async approve(taskId: number, input: TaskApproveInput): Promise<Task> {
     this.ensureWorkflowDependencies();
     const task = await this.getRawTaskById(taskId);
-    const author = await this.agents!.getById(input.authorAgentId);
+    const author = await this.requireCeo(input.authorAgentId, 'approve a task');
+    logger.info('CEO approved task', {
+      author: author.name,
+      reviewCycle: task.reviewCycle,
+      taskId,
+      title: task.title,
+    });
 
-    if (!author.isCeo) {
-      throw new ValidationError('Only the CEO can approve a task');
-    }
-
-    if (task.status !== 'awaiting_review') {
-      throw new ValidationError('Only tasks awaiting review can be approved');
+    if (task.status !== 'waiting') {
+      throw new ValidationError('Only waiting tasks can be approved');
     }
 
     await this.events!.create({
+      attachments: await this.prepareAttachments(task.projectId, input.attachments),
       authorAgentId: author.id,
       body: input.body,
-      kind: 'approval',
-      metadata: { reviewCycle: task.reviewCycle },
+      kind: 'ceo_response',
+      metadata: { responseType: 'approved', reviewCycle: task.reviewCycle },
       taskId,
     });
 
     const updated = await this.repository.update(taskId, {
       completedAt: new Date(),
+      hasDependencyRisk: false,
       status: 'completed',
     });
 
@@ -299,76 +448,66 @@ export class TasksService {
     return this.decorateTask(updated);
   }
 
-  async requestChanges(
-    taskId: number,
-    input: TaskRequestChangesInput,
-  ): Promise<{
-    execution: ExecutionResult<unknown>;
-    task: Task;
-    thread: TaskEvent[];
-  }> {
+  async requestHumanFeedback(taskId: number, input: TaskHumanFeedbackRequestInput): Promise<Task> {
     this.ensureWorkflowDependencies();
+
+    if (!this.configuration || !this.emails) {
+      throw new ValidationError('Human feedback email dependencies are not configured');
+    }
+
     const task = await this.getRawTaskById(taskId);
-    const author = await this.agents!.getById(input.authorAgentId);
+    const author = await this.requireCeo(input.authorAgentId, 'request human feedback');
+    logger.warn('Human feedback requested', {
+      author: author.name,
+      taskId,
+      title: task.title,
+    });
 
-    if (!author.isCeo) {
-      throw new ValidationError('Only the CEO can request changes');
+    if (task.status !== 'waiting') {
+      throw new ValidationError('Human feedback can only be requested while the task is waiting');
     }
 
-    if (!['awaiting_review', 'completed'].includes(task.status)) {
-      throw new ValidationError('Changes can only be requested from review or closed tasks');
+    const config = await this.configuration.get();
+    const recipient = config.human.email?.trim() ?? '';
+    if (!recipient) {
+      throw new ValidationError('Human email is not configured');
     }
 
-    const nextReviewCycle = task.reviewCycle + 1;
-    const changeEventKind = task.status === 'completed' ? 'reopened' : 'changes_requested';
-    const changeEvent = await this.events!.create({
+    const event = await this.events!.create({
+      attachments: await this.prepareAttachments(task.projectId, input.attachments),
       authorAgentId: author.id,
       body: input.body,
-      kind: changeEventKind,
+      kind: 'human_feedback_request',
       metadata: {
-        nextReviewCycle,
-        priorCompletedAt: task.completedAt?.toISOString() ?? null,
-        previousStatus: task.status,
+        requestedBy: author.id,
       },
       taskId,
     });
 
-    const updated = await this.repository.update(taskId, {
-      completedAt: null,
-      hasDependencyRisk: false,
-      reopenedAt: task.status === 'completed' ? new Date() : task.reopenedAt,
-      reopenedFromTaskEventId:
-        task.status === 'completed' ? changeEvent.id : task.reopenedFromTaskEventId,
-      reopenCount: task.status === 'completed' ? task.reopenCount + 1 : task.reopenCount,
-      reviewCycle: nextReviewCycle,
-      status: 'changes_requested',
+    const token = `TASK-${taskId}-EVENT-${event.id}`;
+
+    await this.emails.send({
+      agentId: author.id,
+      subject: `[Task ${taskId}] Human feedback requested`,
+      text: [
+        `Task: ${task.title}`,
+        `Token: ${token}`,
+        '',
+        'The CEO requested additional human input before proceeding.',
+        '',
+        input.body,
+        '',
+        `Reply with the token ${token} in the subject or body when inbound processing is implemented.`,
+      ].join('\n'),
+      to: [recipient],
+    });
+    logger.info('Human feedback email sent', {
+      recipient,
+      taskId,
+      token,
     });
 
-    if (!updated) {
-      throw new NotFoundError(`Task ${taskId} not found`);
-    }
-
-    if (task.status === 'completed') {
-      await this.flagDependencyRisk(taskId, author.id, true);
-    }
-
-    return this.executeTaskCycle(updated, {
-      assignedAgentId: updated.assignedToAgentId,
-      authorAgentId: author.id,
-      sandboxMode: input.sandboxMode,
-      statusBeforeRun: task.status,
-      instruction: input.body,
-      workingDirectory: input.workingDirectory,
-    });
-  }
-
-  async reopen(taskId: number, input: TaskReopenInput): Promise<Task> {
-    const result = await this.requestChanges(taskId, {
-      authorAgentId: input.authorAgentId,
-      body: input.instruction?.trim() || input.body,
-    });
-
-    return result.task;
+    return this.decorateTask(task);
   }
 
   async updateStatus(taskId: number, status: Task['status']): Promise<Task> {
@@ -385,6 +524,16 @@ export class TasksService {
     if (!this.events || !this.agents || !this.projects || !this.executions) {
       throw new ValidationError('Task workflow dependencies are not configured');
     }
+  }
+
+  private async requireCeo(authorAgentId: number, action: string) {
+    const author = await this.agents!.getById(authorAgentId);
+
+    if (!author.isCeo) {
+      throw new ValidationError(`Only the CEO can ${action}`);
+    }
+
+    return author;
   }
 
   private async getRawTaskById(id: number): Promise<Task> {
@@ -420,20 +569,20 @@ export class TasksService {
   private async executeTaskCycle(
     task: Task,
     input: {
-      assignedAgentId: number | null;
       authorAgentId: number;
       instruction: string;
+      runRequestMetadata?: Record<string, unknown>;
       sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
       statusBeforeRun: Task['status'];
       workingDirectory?: string;
     },
   ): Promise<{
-    execution: ExecutionResult<unknown>;
+    execution: ExecutionResult<TaskAgentResponse>;
     task: Task;
     thread: TaskEvent[];
   }> {
     const { canRun, runBlockedReason } = await this.decorateTask(task);
-    const assignedAgentId = input.assignedAgentId ?? task.assignedToAgentId;
+    const assignedAgentId = task.assignedToAgentId;
 
     if (!assignedAgentId) {
       throw new ValidationError(`Task ${task.id} has no assigned agent`);
@@ -443,41 +592,27 @@ export class TasksService {
       throw new ValidationError(runBlockedReason ?? `Task ${task.id} cannot run`);
     }
 
-    let currentTask = task;
-    if (task.assignedToAgentId !== assignedAgentId) {
-      const assigned = await this.repository.assign(task.id, assignedAgentId);
-      if (!assigned) {
-        throw new NotFoundError(`Task ${task.id} not found`);
-      }
-      currentTask = assigned;
-      await this.events!.create({
-        authorAgentId: input.authorAgentId,
-        body: `Assigned task to agent #${assignedAgentId}.`,
-        kind: 'assignment',
-        metadata: { assignedAgentId },
-        taskId: task.id,
-      });
-    }
-
     await this.events!.create({
       authorAgentId: input.authorAgentId,
       body: input.instruction,
-      kind: 'ceo_instruction',
-      metadata: {
-        assignedAgentId,
-        reviewCycle: currentTask.reviewCycle,
-        statusBeforeRun: input.statusBeforeRun,
-      },
+      kind: 'run_request',
+      metadata: input.runRequestMetadata ?? null,
       taskId: task.id,
     });
+    logger.info('Task entered in_progress', {
+      actorId: assignedAgentId,
+      taskId: task.id,
+      title: task.title,
+    });
 
-    currentTask =
+    const currentTask =
       (await this.repository.update(task.id, {
         completedAt: null,
+        hasDependencyRisk: false,
         status: 'in_progress',
-      })) ?? currentTask;
+      })) ?? task;
 
-    let execution: ExecutionResult<unknown>;
+    let execution: ExecutionResult<TaskAgentResponse>;
     try {
       const project = await this.projects!.getById(currentTask.projectId);
       const thread = await this.events!.findByTaskId(task.id);
@@ -505,6 +640,12 @@ export class TasksService {
       });
     } catch (error) {
       const message = errorToMessage(error);
+      logger.error('Task execution failed before response', {
+        actorId: assignedAgentId,
+        error: message,
+        taskId: task.id,
+        title: task.title,
+      });
       await this.repository.update(task.id, {
         completedAt: null,
         status: 'failed',
@@ -516,7 +657,6 @@ export class TasksService {
         metadata: {
           error: message,
           nextStatus: 'failed',
-          reviewCycle: currentTask.reviewCycle,
           statusBeforeRun: input.statusBeforeRun,
         },
         taskId: task.id,
@@ -524,29 +664,62 @@ export class TasksService {
       throw error;
     }
 
+    if (!execution.parsedOutput) {
+      const message = execution.validationError ?? 'Task execution returned invalid structured output';
+      logger.error('Task execution returned invalid agent output', {
+        actorId: assignedAgentId,
+        executionId: execution.id,
+        taskId: task.id,
+        title: task.title,
+        validationError: message,
+      });
+      await this.repository.update(task.id, {
+        completedAt: null,
+        lastExecutionId: execution.id,
+        status: 'failed',
+      });
+      await this.events!.create({
+        authorAgentId: input.authorAgentId,
+        body: `Execution failed validation: ${message}`,
+        executionId: execution.id,
+        kind: 'status_changed',
+        metadata: {
+          error: message,
+          nextStatus: 'failed',
+          rawOutput: execution.rawOutput,
+        },
+        taskId: task.id,
+      });
+      throw new ValidationError(message);
+    }
+
     await this.repository.update(task.id, {
       completedAt: null,
       hasDependencyRisk: false,
       lastExecutionId: execution.id,
-      status: 'awaiting_review',
+      status: 'waiting',
     });
 
     await this.events!.create({
+      attachments: await this.prepareAttachments(currentTask.projectId, execution.parsedOutput.attachments),
       authorAgentId: assignedAgentId,
-      body: execution.rawOutput,
+      body: execution.parsedOutput.body,
       executionId: execution.id,
-      kind: 'agent_reply',
-      metadata: { operationKey: execution.operationKey, reviewCycle: currentTask.reviewCycle },
+      kind: 'agent_response',
+      metadata: {
+        responseType: execution.parsedOutput.responseType,
+        reviewCycle: currentTask.reviewCycle,
+        summary: execution.parsedOutput.summary ?? null,
+      },
       taskId: task.id,
     });
-
-    await this.events!.create({
-      authorAgentId: assignedAgentId,
-      body: 'Submitted work for CEO review.',
+    logger.info('Task waiting for CEO', {
+      actorId: assignedAgentId,
       executionId: execution.id,
-      kind: 'submission',
-      metadata: { reviewCycle: currentTask.reviewCycle },
+      responseType: execution.parsedOutput.responseType,
+      summary: execution.parsedOutput.summary ?? null,
       taskId: task.id,
+      title: task.title,
     });
 
     const updatedTask = await this.getById(task.id);
@@ -557,36 +730,46 @@ export class TasksService {
     };
   }
 
-  private async flagDependencyRisk(
-    taskId: number,
-    authorAgentId: number,
-    hasDependencyRisk: boolean,
-  ): Promise<void> {
-    const dependents = await this.repository.findDependents(taskId);
-
-    if (dependents.length === 0) {
-      return;
+  private async prepareAttachments(
+    projectId: number,
+    attachments: TaskEventAttachmentInput[] | undefined,
+  ): Promise<TaskEventAttachmentInput[] | null> {
+    if (!attachments || attachments.length === 0) {
+      return null;
     }
 
-    await this.repository.setDependencyRisk(
-      dependents.map((dependent) => dependent.id),
-      hasDependencyRisk,
-    );
+    const project = await this.projects!.getById(projectId);
+    const prepared: TaskEventAttachmentInput[] = [];
 
-    if (!hasDependencyRisk) {
-      return;
+    for (const attachment of attachments) {
+      if (attachment.kind === 'external_url') {
+        prepared.push({
+          kind: 'external_url',
+          mediaType: attachment.mediaType ?? null,
+          title: attachment.title,
+          url: attachment.url,
+        });
+        continue;
+      }
+
+      const absolutePath = resolve(project.workingDirectory, attachment.path);
+      if (!absolutePath.startsWith(project.workingDirectory)) {
+        throw new ValidationError(`Unsafe attachment path: ${attachment.path}`);
+      }
+
+      const fileStat = await stat(absolutePath);
+      if (!fileStat.isFile()) {
+        throw new ValidationError(`Attachment file does not exist: ${attachment.path}`);
+      }
+
+      prepared.push({
+        kind: 'project_file',
+        mediaType: attachment.mediaType ?? guessMediaType(attachment.path),
+        path: attachment.path,
+        title: attachment.title,
+      });
     }
 
-    await Promise.all(
-      dependents.map((dependent) =>
-        this.events!.create({
-          authorAgentId,
-          body: `Dependency risk flagged because upstream task #${taskId} re-entered review.`,
-          kind: 'dependency_risk_flagged',
-          metadata: { sourceTaskId: taskId },
-          taskId: dependent.id,
-        }),
-      ),
-    );
+    return prepared;
   }
 }

@@ -31,10 +31,20 @@ export interface EmailConfiguration {
   resendApiKey: SecretFieldState;
 }
 
+export interface HumanConfiguration {
+  email: string | null;
+}
+
+export interface SteelConfiguration {
+  apiKey: SecretFieldState;
+}
+
 export interface Configuration {
   dokku: DokkuConfiguration;
   email: EmailConfiguration;
   github: GithubConfiguration;
+  human: HumanConfiguration;
+  steel: SteelConfiguration;
 }
 
 export interface InternalConfigurationSecret {
@@ -63,6 +73,10 @@ export interface InternalConfiguration {
   dokku: DokkuConfiguration;
   email: InternalEmailConfiguration;
   github: InternalGithubConfiguration;
+  human: HumanConfiguration;
+  steel: {
+    apiKey: InternalConfigurationSecret;
+  };
   id: number;
 }
 
@@ -81,8 +95,10 @@ export interface ConfigurationRecord {
   cfg_github_client_secret: string | null;
   cfg_github_installation_id: string | null;
   cfg_github_private_key: string | null;
+  cfg_human_email: string | null;
   cfg_id: number;
   cfg_resend_api_key: string | null;
+  cfg_steel_api_key: string | null;
 }
 
 export function toInternalConfiguration(record: ConfigurationRecord): InternalConfiguration {
@@ -114,6 +130,14 @@ export function toInternalConfiguration(record: ConfigurationRecord): InternalCo
         value: record.cfg_github_private_key,
       },
     },
+    human: {
+      email: record.cfg_human_email,
+    },
+    steel: {
+      apiKey: {
+        value: record.cfg_steel_api_key,
+      },
+    },
     id: record.cfg_id,
   };
 }
@@ -140,6 +164,12 @@ export function toConfiguration(config: InternalConfiguration): Configuration {
       installationId: config.github.installationId,
       privateKey: {
         configured: Boolean(config.github.privateKey.value),
+      },
+    },
+    human: config.human,
+    steel: {
+      apiKey: {
+        configured: Boolean(config.steel.apiKey.value),
       },
     },
   };

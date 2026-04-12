@@ -26,6 +26,7 @@ export interface ExecutionOperationDefinition<TParsed = unknown> {
   operationKey: string;
   skillKeys?: string[];
   staticFragments?: string[];
+  timeoutMs?: number;
   outputSchema?: import('zod').ZodType<TParsed>;
 }
 
@@ -63,6 +64,7 @@ export interface ModelRunRequest {
   model: string;
   prompt: string;
   sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
+  timeoutMs?: number;
   workingDirectory: string;
 }
 

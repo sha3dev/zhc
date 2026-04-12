@@ -329,6 +329,53 @@ describe('ExecutionsService', () => {
     );
   });
 
+  it('extracts structured JSON from fenced cli output', async () => {
+    const rawOutput = `The directory is empty — greenfield project. Let me produce the project definition.
+
+\`\`\`json
+{"name":"Launch Site","definitionBrief":"Build it","supportArtifacts":[{"path":"docs/project-brief.md","title":"Project Brief","content":"# Brief"}],"tasks":[{"key":"spec","title":"Spec","description":"Write spec","deliverable":"Detailed spec doc","acceptanceCriteria":["Spec exists"],"implementationNotes":[],"sort":0,"assignedToAgentKey":"product-designer","dependsOnTaskKeys":[]}]}
+\`\`\``;
+    const repository = createExecutionRepository();
+    const service = new ExecutionsService(
+      { getById: vi.fn(async () => createAgent()), listForMemory: vi.fn() },
+      {
+        listStatus: vi.fn(async () => ({
+          cachedAt: null,
+          items: [
+            {
+              command: 'codex',
+              id: 'codex',
+              models: ['gpt-5.4'],
+              name: 'Codex',
+              status: 'configured',
+              version: '1.0.0',
+            },
+          ],
+        })),
+      },
+      createPrompts(),
+      createMemoryProvider(),
+      repository,
+      [createRunner(rawOutput)],
+    );
+
+    const result = await service.execute({
+      agentId: 1,
+      operationKey: 'create-project',
+      userInput: 'build app',
+    });
+
+    expect(result.validationError).toBeNull();
+    expect(result.parsedOutput).toMatchObject({ name: 'Launch Site' });
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parsedOutput: expect.objectContaining({ name: 'Launch Site' }),
+        rawOutput,
+        validationError: null,
+      }),
+    );
+  });
+
   it('preserves raw output and returns a validation error when parsing fails', async () => {
     const rawOutput = '{"bad":"shape"}';
     const repository = createExecutionRepository();
@@ -495,6 +542,7 @@ describe('ExecutionsService', () => {
 
     expect(skills.getMany).toHaveBeenCalledWith([
       'playwright-browser',
+      'steel-browser',
       'dokku',
       'postgres',
       'http-client',
@@ -502,6 +550,7 @@ describe('ExecutionsService', () => {
     ]);
     expect(capture.last?.prompt).toContain('# Skills');
     expect(capture.last?.prompt).toContain('## playwright-browser');
+    expect(capture.last?.prompt).toContain('## steel-browser');
     expect(capture.last?.prompt).toContain('Skill instructions for dokku.');
     expect(capture.last?.prompt.indexOf('# Skills')).toBeLessThan(
       capture.last?.prompt.indexOf('# Execution Context') ?? -1,

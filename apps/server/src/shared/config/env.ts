@@ -5,10 +5,7 @@ import dotenv from 'dotenv';
 import { z } from 'zod';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const envCandidates = [
-  resolve(process.cwd(), '.env'),
-  resolve(currentDir, '../../../../../.env'),
-];
+const envCandidates = [resolve(process.cwd(), '.env'), resolve(currentDir, '../../../../../.env')];
 
 for (const path of envCandidates) {
   dotenv.config({ path, override: false });

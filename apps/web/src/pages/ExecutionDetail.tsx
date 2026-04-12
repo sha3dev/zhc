@@ -82,7 +82,7 @@ export default function ExecutionDetail() {
             {'< back to executions'}
           </Button>
           <SectionHeader label="EXECUTION DETAIL" />
-          <h1 className="font-mono text-xl font-bold text-foreground sm:text-3xl">
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-3xl">
             execution
             <span
               className="ml-1 animate-cursor-blink text-primary"
@@ -96,7 +96,7 @@ export default function ExecutionDetail() {
 
       {error && (
         <div className="border border-destructive/40 bg-destructive/5 px-4 py-3">
-          <p className="font-code text-xs text-destructive">{`> error: ${error}`}</p>
+          <p className="font-code text-destructive text-xs">{`> error: ${error}`}</p>
         </div>
       )}
 
@@ -111,39 +111,39 @@ export default function ExecutionDetail() {
               <Badge variant="outline">{execution.model}</Badge>
             </div>
             <div className="space-y-1">
-              <h2 className="font-mono text-lg text-foreground sm:text-2xl">
+              <h2 className="font-mono text-foreground text-lg sm:text-2xl">
                 {execution.agentName}
               </h2>
-              <p className="font-code text-xs text-muted-foreground">execution #{execution.id}</p>
+              <p className="font-code text-muted-foreground text-xs">execution #{execution.id}</p>
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="border border-border bg-card p-4">
               <p className="mono-label">executed_at</p>
-              <p className="mt-2 font-mono text-sm text-foreground">
+              <p className="mt-2 font-mono text-foreground text-sm">
                 {formatDate(execution.executedAt)}
               </p>
             </div>
             <div className="border border-border bg-card p-4">
               <p className="mono-label">duration</p>
-              <p className="mt-2 font-mono text-sm text-foreground">
+              <p className="mt-2 font-mono text-foreground text-sm">
                 {formatDuration(execution.durationMs)}
               </p>
             </div>
             <div className="border border-border bg-card p-4">
               <p className="mono-label">sandbox</p>
-              <p className="mt-2 font-mono text-sm text-foreground">{execution.sandboxMode}</p>
+              <p className="mt-2 font-mono text-foreground text-sm">{execution.sandboxMode}</p>
             </div>
             <div className="border border-border bg-card p-4 md:col-span-2 xl:col-span-1">
               <p className="mono-label">prompt_path</p>
-              <p className="mt-2 break-all font-mono text-sm text-foreground">
+              <p className="mt-2 break-all font-mono text-foreground text-sm">
                 {execution.promptPath}
               </p>
             </div>
             <div className="border border-border bg-card p-4 md:col-span-2">
               <p className="mono-label">working_directory</p>
-              <p className="mt-2 break-all font-mono text-sm text-foreground">
+              <p className="mt-2 break-all font-mono text-foreground text-sm">
                 {execution.workingDirectory}
               </p>
             </div>
@@ -164,9 +164,9 @@ export default function ExecutionDetail() {
             <div className="space-y-4">
               {execution.promptBlocks.map((block) => (
                 <div key={`${block.kind}:${block.key}`} className="border border-border bg-card">
-                  <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2 border-border border-b px-4 py-3">
                     <Badge variant="secondary">{block.kind}</Badge>
-                    <span className="font-mono text-xs text-foreground">{block.title}</span>
+                    <span className="font-mono text-foreground text-xs">{block.title}</span>
                     <span className="font-code text-2xs text-muted-foreground">{block.key}</span>
                   </div>
                   <div className="p-4">
@@ -186,7 +186,7 @@ export default function ExecutionDetail() {
             <section className="space-y-3">
               <SectionHeader label="VALIDATION ERROR" />
               <div className="border border-destructive/40 bg-destructive/5 px-4 py-3">
-                <p className="font-code text-xs text-destructive">{execution.validationError}</p>
+                <p className="font-code text-destructive text-xs">{execution.validationError}</p>
               </div>
             </section>
           )}

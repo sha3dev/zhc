@@ -8,6 +8,8 @@ Use a skill when the task needs one of these domain tools:
 
 - `playwright-browser`: browser automation, screenshots, console/network diagnostics, and raw
   Playwright scripts.
+- `steel-browser`: remote cloud browser sessions through Steel, with profiles, session viewer URLs,
+  screenshots, downloads, and external-site browsing.
 - `dokku`: inspect and operate the configured Dokku instance.
 - `postgres`: run SQL or raw `pg` client scripts against `DATABASE_URL`.
 - `http-client`: call HTTP endpoints or run raw `fetch` scripts.

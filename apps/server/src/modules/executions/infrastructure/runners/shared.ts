@@ -3,6 +3,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { InfrastructureError } from '../../../../shared/errors/app-error.js';
+import { logger } from '../../../../shared/observability/logger.js';
+import { resolveCliCommand } from '../../../../shared/system/cli-resolver.js';
 
 const NONINTERACTIVE_ENV = {
   ...process.env,
@@ -12,7 +14,7 @@ const NONINTERACTIVE_ENV = {
   TERM: 'dumb',
 };
 
-const CLI_RUN_TIMEOUT_MS = 120_000;
+const DEFAULT_CLI_RUN_TIMEOUT_MS = 300_000;
 
 interface SpawnResult {
   exitCode: number | null;
@@ -25,26 +27,49 @@ export async function runCliCommand(
   args: string[],
   workingDirectory: string,
   stdin: string | null,
+  timeoutMs: number = DEFAULT_CLI_RUN_TIMEOUT_MS,
 ): Promise<SpawnResult> {
+  const resolvedCommand = await resolveCliCommand(command);
+  if (!resolvedCommand) {
+    throw new InfrastructureError(`CLI command ${command} is not available`, {
+      details: {
+        command,
+        path: process.env.PATH ?? '',
+      },
+    });
+  }
+
   return await new Promise((resolve, reject) => {
+    const startedAt = Date.now();
     let settled = false;
-    const child = spawn(command, args, {
+    const child = spawn(resolvedCommand, args, {
       cwd: workingDirectory,
       env: NONINTERACTIVE_ENV,
       stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    logger.info('CLI start', {
+      args: args.join(' '),
+      command,
+      resolvedCommand,
+      workingDirectory,
     });
     const timeout = setTimeout(() => {
       if (settled) {
         return;
       }
 
+      logger.warn('CLI timeout reached, terminating process', {
+        command,
+        timeoutMs,
+        workingDirectory,
+      });
       child.kill('SIGTERM');
       setTimeout(() => {
         if (!settled) {
           child.kill('SIGKILL');
         }
       }, 5_000).unref();
-    }, CLI_RUN_TIMEOUT_MS);
+    }, timeoutMs);
 
     let stdout = '';
     let stderr = '';
@@ -58,11 +83,28 @@ export async function runCliCommand(
     child.on('error', (error) => {
       settled = true;
       clearTimeout(timeout);
+      logger.error('CLI spawn failed', {
+        command,
+        error: String(error),
+        workingDirectory,
+      });
       reject(new InfrastructureError(`Failed to spawn ${command}`, { cause: error }));
     });
     child.on('close', (exitCode) => {
       settled = true;
       clearTimeout(timeout);
+      const durationMs = Date.now() - startedAt;
+      logger.info('CLI finish', {
+        command,
+        durationMs,
+        exitCode,
+      });
+      if (stdout.trim()) {
+        logger.cli(`${command} stdout`, stdout);
+      }
+      if (stderr.trim()) {
+        logger.cli(`${command} stderr`, stderr);
+      }
       resolve({ exitCode, stderr, stdout });
     });
 

@@ -148,13 +148,7 @@ function sortTasksForCreation(plan: CreateProjectOperationOutput) {
 }
 
 function buildActivePath(tasks: Task[]): { activePathIds: number[]; activeTaskId: number | null } {
-  const activeStatuses: Task['status'][] = [
-    'reopened',
-    'changes_requested',
-    'awaiting_review',
-    'in_progress',
-    'assigned',
-  ];
+  const activeStatuses: Task['status'][] = ['waiting', 'in_progress'];
   const taskById = new Map(tasks.map((task) => [task.id, task]));
   const activeTask =
     tasks
@@ -192,14 +186,7 @@ function buildActivePath(tasks: Task[]): { activePathIds: number[]; activeTaskId
 
 function decorateProjectTasks(tasks: Task[]): Task[] {
   const completedById = new Map(tasks.map((task) => [task.id, task.status === 'completed']));
-  const runnableStatuses = new Set<Task['status']>([
-    'pending',
-    'assigned',
-    'in_progress',
-    'changes_requested',
-    'reopened',
-    'failed',
-  ]);
+  const runnableStatuses = new Set<Task['status']>(['pending', 'failed']);
 
   return tasks.map((task) => {
     const dependenciesCompleted = task.dependsOnTaskIds.every(
@@ -210,7 +197,7 @@ function decorateProjectTasks(tasks: Task[]): Task[] {
       return {
         ...task,
         canRun: false,
-        runBlockedReason: 'Task must be assigned before it can run.',
+        runBlockedReason: 'Task must have an assigned agent or expert.',
       };
     }
 
@@ -507,16 +494,19 @@ export class ProjectsService {
   private resolveAssignedAgentId(
     task: CreateProjectOperationOutput['tasks'][number],
     agentByKey: Map<string, RegistryEntityMemorySummary>,
-  ): number | null {
+  ): number {
     if (task.assignedToAgentId) {
       return task.assignedToAgentId;
     }
 
     if (task.assignedToAgentKey) {
-      return agentByKey.get(task.assignedToAgentKey)?.id ?? null;
+      const resolved = agentByKey.get(task.assignedToAgentKey)?.id ?? null;
+      if (resolved) {
+        return resolved;
+      }
     }
 
-    return null;
+    throw new ValidationError(`Task ${task.key} must be assigned to an agent or expert`);
   }
 
   private validatePlan(plan: CreateProjectOperationOutput): void {
@@ -534,6 +524,10 @@ export class ProjectsService {
     }
 
     for (const task of plan.tasks) {
+      if (!task.assignedToAgentId && !task.assignedToAgentKey) {
+        throw new ValidationError(`Task ${task.key} must include an assigned agent or expert`);
+      }
+
       for (const dependencyKey of task.dependsOnTaskKeys) {
         if (!taskKeys.has(dependencyKey)) {
           throw new ValidationError(

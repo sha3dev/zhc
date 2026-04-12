@@ -210,7 +210,7 @@ export default function Agents() {
 
   return (
     <div
-      className="relative min-h-full p-4 sm:p-6 space-y-5 sm:space-y-6"
+      className="relative min-h-full space-y-5 p-4 sm:space-y-6 sm:p-6"
       style={{
         backgroundImage:
           'repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(55,247,18,0.018) 28px, rgba(55,247,18,0.018) 29px)',
@@ -218,18 +218,18 @@ export default function Agents() {
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1 min-w-0">
+        <div className="min-w-0 space-y-1">
           <SectionHeader label="AGENT REGISTRY" />
-          <h1 className="font-mono text-xl sm:text-2xl font-bold text-foreground">
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-2xl">
             agents
             <span
-              className="text-primary animate-cursor-blink ml-1"
+              className="ml-1 animate-cursor-blink text-primary"
               style={{ textShadow: 'var(--glow-primary)' }}
             >
               |
             </span>
           </h1>
-          <p className="font-code text-xs text-muted-foreground hidden sm:block">
+          <p className="hidden font-code text-muted-foreground text-xs sm:block">
             {'$ list --registry --all'}
           </p>
         </div>
@@ -240,7 +240,7 @@ export default function Agents() {
             setFormError('');
             setShowCreate(true);
           }}
-          className="shrink-0 mt-1 border border-primary text-primary font-mono text-xs px-3 sm:px-4 py-1.5 tracking-widest transition-all duration-150 hover:bg-primary/10 active:scale-[0.96] flex items-center gap-1.5"
+          className="mt-1 flex shrink-0 items-center gap-1.5 border border-primary px-3 py-1.5 font-mono text-primary text-xs tracking-widest transition-all duration-150 hover:bg-primary/10 active:scale-[0.96] sm:px-4"
           style={{ boxShadow: '0 0 6px rgba(55,247,18,0.2)' }}
         >
           <Plus className="h-3 w-3" />
@@ -251,20 +251,20 @@ export default function Agents() {
 
       {/* Notices */}
       {notice && (
-        <div className="border border-primary/40 bg-primary/5 px-3 py-2 font-mono text-xs text-primary animate-toast">
+        <div className="animate-toast border border-primary/40 bg-primary/5 px-3 py-2 font-mono text-primary text-xs">
           {notice}
         </div>
       )}
       {error && (
-        <div className="border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive animate-toast">{`> error: ${error}`}</div>
+        <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">{`> error: ${error}`}</div>
       )}
 
       {/* Toolbar — stacks on mobile */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex flex-col gap-1 flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-1 flex-col gap-1">
           <Label htmlFor="search">search.query</Label>
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Search className="-translate-y-1/2 absolute top-1/2 left-2 h-3 w-3 text-muted-foreground" />
             <Input
               id="search"
               type="search"
@@ -295,10 +295,10 @@ export default function Agents() {
       </div>
 
       {/* Table */}
-      <div className="border border-border bg-card overflow-x-auto">
+      <div className="overflow-x-auto border border-border bg-card">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent cursor-default">
+            <TableRow className="cursor-default hover:bg-transparent">
               <TableHead>name</TableHead>
               <TableHead className="hidden sm:table-cell">model</TableHead>
               <TableHead>status</TableHead>
@@ -309,10 +309,10 @@ export default function Agents() {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={4} />)
             ) : agents.length === 0 ? (
-              <TableRow className="hover:bg-transparent cursor-default">
+              <TableRow className="cursor-default hover:bg-transparent">
                 <TableCell
                   colSpan={4}
-                  className="text-center font-code text-xs text-muted-foreground py-10"
+                  className="py-10 text-center font-code text-muted-foreground text-xs"
                 >
                   {'> no agents match the current filters.'}
                 </TableCell>
@@ -328,12 +328,12 @@ export default function Agents() {
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
                       {agent.isCeo && <AgentCeoBadge />}
-                      <span className="font-mono text-xs font-bold text-foreground">
+                      <span className="font-bold font-mono text-foreground text-xs">
                         {agent.name}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-code text-xs text-muted-foreground hidden sm:table-cell">
+                  <TableCell className="hidden font-code text-muted-foreground text-xs sm:table-cell">
                     {agent.model && agent.modelCliId ? (
                       `${CLI_LABELS[agent.modelCliId] ?? agent.modelCliId} · ${agent.model}`
                     ) : (
@@ -359,7 +359,7 @@ export default function Agents() {
                           setAgentToDelete(agent);
                           setShowDelete(true);
                         }}
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive hover:border-transparent"
+                        className="h-6 w-6 text-muted-foreground hover:border-transparent hover:text-destructive"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -406,7 +406,7 @@ export default function Agents() {
               <Separator />
               <div>
                 <p className="mono-label mb-3">{'> runtime'}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1">
                     <Label htmlFor="c-model">model</Label>
                     <Select
@@ -454,11 +454,11 @@ export default function Agents() {
                 </div>
               </div>
               <Separator />
-              <div className="flex flex-col flex-1 min-h-0 gap-1">
+              <div className="flex min-h-0 flex-1 flex-col gap-1">
                 <p className="mono-label">{'> definition'}</p>
                 <Suspense
                   fallback={
-                    <div className="flex-1 border border-input animate-skeleton min-h-[200px]" />
+                    <div className="min-h-[200px] flex-1 animate-skeleton border border-input" />
                   }
                 >
                   <MarkdownEditor
@@ -472,7 +472,7 @@ export default function Agents() {
                 </Suspense>
               </div>
               {formError && (
-                <div className="border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive animate-toast">
+                <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">
                   {`> error: ${formError}`}
                 </div>
               )}
@@ -509,12 +509,12 @@ export default function Agents() {
             <DialogDescription>this action is irreversible.</DialogDescription>
           </DialogHeader>
           <DialogBody>
-            <p className="font-code text-xs text-muted-foreground">
+            <p className="font-code text-muted-foreground text-xs">
               {'> remove '}
               <strong className="text-foreground">{agentToDelete?.name}</strong>
               {' from registry.'}
             </p>
-            <p className="font-code text-xs text-muted-foreground mt-1">
+            <p className="mt-1 font-code text-muted-foreground text-xs">
               {'> agent will be permanently removed from the registry.'}
             </p>
           </DialogBody>

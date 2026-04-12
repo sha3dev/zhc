@@ -34,7 +34,7 @@ function GlowStat({
   } as const;
   return (
     <p
-      className="font-mono text-4xl font-bold tabular-nums transition-all duration-500"
+      className="font-bold font-mono text-4xl tabular-nums transition-all duration-500"
       style={{ color: styles[color].color, textShadow: styles[color].shadow }}
     >
       {value}
@@ -44,7 +44,7 @@ function GlowStat({
 
 function SegmentBar({ filled, total }: { filled: number; total: number }) {
   return (
-    <div className="flex gap-px mt-1">
+    <div className="mt-1 flex gap-px">
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
@@ -65,9 +65,9 @@ function ModelBar({ model, count, max }: { model: string; count: number; max: nu
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-code text-xs text-muted-foreground truncate">{`$ ${model}`}</span>
+        <span className="truncate font-code text-muted-foreground text-xs">{`$ ${model}`}</span>
         <span
-          className="font-mono text-xs tabular-nums shrink-0"
+          className="shrink-0 font-mono text-xs tabular-nums"
           style={{ color: 'hsl(var(--primary))', textShadow: 'var(--glow-primary-sm)' }}
         >
           {count}
@@ -134,7 +134,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className="relative min-h-full p-4 sm:p-6 space-y-6 sm:space-y-8"
+      className="relative min-h-full space-y-6 p-4 sm:space-y-8 sm:p-6"
       style={{
         backgroundImage:
           'repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(55,247,18,0.018) 28px, rgba(55,247,18,0.018) 29px)',
@@ -142,18 +142,18 @@ export default function Dashboard() {
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1 min-w-0">
+        <div className="min-w-0 space-y-1">
           <SectionHeader label="DASHBOARD" />
-          <h1 className="font-mono text-xl sm:text-2xl font-bold text-foreground">
+          <h1 className="font-bold font-mono text-foreground text-xl sm:text-2xl">
             dashboard
             <span
-              className="text-primary animate-cursor-blink ml-1"
+              className="ml-1 animate-cursor-blink text-primary"
               style={{ textShadow: 'var(--glow-primary)' }}
             >
               |
             </span>
           </h1>
-          <p className="font-code text-xs text-muted-foreground hidden sm:block">
+          <p className="hidden font-code text-muted-foreground text-xs sm:block">
             agent_orchestrator :: control surface
           </p>
         </div>
@@ -162,17 +162,17 @@ export default function Dashboard() {
           size="sm"
           onClick={() => load(true)}
           disabled={refreshing || loading}
-          className="shrink-0 mt-1"
+          className="mt-1 shrink-0"
         >
           <RefreshCw
-            className={`h-3 w-3 mr-1.5 transition-transform duration-500 ${refreshing ? 'animate-spin' : ''}`}
+            className={`mr-1.5 h-3 w-3 transition-transform duration-500 ${refreshing ? 'animate-spin' : ''}`}
           />
           <span className="hidden sm:inline">refresh</span>
         </Button>
       </div>
 
       {error && (
-        <div className="border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive font-mono animate-toast">
+        <div className="animate-toast border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-destructive text-xs">
           {`> error: ${error}`}
         </div>
       )}
@@ -180,13 +180,13 @@ export default function Dashboard() {
       {/* Stats — 1 col mobile, 2 col sm, 4 col lg */}
       <div className="space-y-3">
         <SectionHeader label="SYSTEM METRICS" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {loading
             ? STAT_CONFIGS.map((s) => <StatCardSkeleton key={s.key} />)
             : STAT_CONFIGS.map((s, i) => (
                 <div
                   key={s.key}
-                  className="border border-border bg-card p-4 space-y-2 animate-page-enter"
+                  className="animate-page-enter space-y-2 border border-border bg-card p-4"
                   style={{
                     animationDelay: `${i * 50}ms`,
                     boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
@@ -200,8 +200,8 @@ export default function Dashboard() {
       </div>
 
       {/* Model distribution + topology — 1 col mobile, 3 col lg */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="lg:col-span-2 border border-border bg-card p-4 sm:p-5 space-y-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="space-y-4 border border-border bg-card p-4 sm:p-5 lg:col-span-2">
           <SectionHeader label="MODEL DISTRIBUTION" />
           {loading ? (
             <div className="space-y-3.5 pt-1">
@@ -210,7 +210,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : modelEntries.length === 0 ? (
-            <p className="font-code text-xs text-muted-foreground pt-1">{'> no data'}</p>
+            <p className="pt-1 font-code text-muted-foreground text-xs">{'> no data'}</p>
           ) : (
             <div className="space-y-3.5 pt-1">
               {modelEntries.map(([model, count], i) => (
@@ -226,19 +226,19 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="border border-border bg-card p-4 sm:p-5 space-y-4">
+        <div className="space-y-4 border border-border bg-card p-4 sm:p-5">
           <SectionHeader label="TOPOLOGY" />
           {loading ? (
             <div className="space-y-5 pt-1">
               <div className="space-y-2">
-                <div className="animate-skeleton h-2.5 w-24" />
-                <div className="animate-skeleton h-8 w-10" />
-                <div className="animate-skeleton h-1.5 w-full" />
+                <div className="h-2.5 w-24 animate-skeleton" />
+                <div className="h-8 w-10 animate-skeleton" />
+                <div className="h-1.5 w-full animate-skeleton" />
               </div>
-              <div className="border-t border-border pt-4 space-y-2">
-                <div className="animate-skeleton h-2.5 w-24" />
-                <div className="animate-skeleton h-8 w-10" />
-                <div className="animate-skeleton h-1.5 w-full" />
+              <div className="space-y-2 border-border border-t pt-4">
+                <div className="h-2.5 w-24 animate-skeleton" />
+                <div className="h-8 w-10 animate-skeleton" />
+                <div className="h-1.5 w-full animate-skeleton" />
               </div>
             </div>
           ) : (
@@ -246,7 +246,7 @@ export default function Dashboard() {
               <div>
                 <p className="mono-label">top_level.agents</p>
                 <p
-                  className="font-mono text-3xl font-bold mt-1 tabular-nums"
+                  className="mt-1 font-bold font-mono text-3xl tabular-nums"
                   style={{ color: 'hsl(var(--primary))', textShadow: 'var(--glow-primary)' }}
                 >
                   {stats?.topLevelAgents ?? 0}
@@ -256,10 +256,10 @@ export default function Dashboard() {
                   total={Math.max(10, stats?.topLevelAgents ?? 10)}
                 />
               </div>
-              <div className="border-t border-border pt-4">
+              <div className="border-border border-t pt-4">
                 <p className="mono-label">max_depth.levels</p>
                 <p
-                  className="font-mono text-3xl font-bold mt-1 tabular-nums"
+                  className="mt-1 font-bold font-mono text-3xl tabular-nums"
                   style={{ color: 'hsl(var(--info))', textShadow: '0 0 8px rgba(0,166,244,0.4)' }}
                 >
                   {stats?.maxDepth ?? 0}
@@ -272,7 +272,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => navigate('/agents')}
-                className="w-full border border-primary/40 text-primary font-mono text-xs py-1.5 tracking-widest transition-all duration-200 hover:bg-primary/5 hover:border-primary active:scale-[0.97]"
+                className="w-full border border-primary/40 py-1.5 font-mono text-primary text-xs tracking-widest transition-all duration-200 hover:border-primary hover:bg-primary/5 active:scale-[0.97]"
                 style={{ boxShadow: '0 0 4px rgba(55,247,18,0.15)' }}
               >
                 [ VIEW REGISTRY ]
@@ -290,7 +290,7 @@ export default function Dashboard() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent cursor-default">
+                  <TableRow className="cursor-default hover:bg-transparent">
                     <TableHead>name</TableHead>
                     <TableHead className="hidden sm:table-cell">model</TableHead>
                     <TableHead>status</TableHead>
@@ -305,12 +305,12 @@ export default function Dashboard() {
               </Table>
             </div>
           ) : recentAgents.length === 0 ? (
-            <div className="px-4 sm:px-5 py-8 space-y-2 animate-page-enter">
-              <p className="font-code text-xs text-muted-foreground">{'> no agents registered.'}</p>
+            <div className="animate-page-enter space-y-2 px-4 py-8 sm:px-5">
+              <p className="font-code text-muted-foreground text-xs">{'> no agents registered.'}</p>
               <button
                 type="button"
                 onClick={() => navigate('/agents')}
-                className="font-mono text-xs text-primary hover:underline transition-colors duration-200 active:opacity-70"
+                className="font-mono text-primary text-xs transition-colors duration-200 hover:underline active:opacity-70"
                 style={{ textShadow: 'var(--glow-primary-sm)' }}
               >
                 {'$ create first agent_'}
@@ -320,7 +320,7 @@ export default function Dashboard() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent cursor-default">
+                  <TableRow className="cursor-default hover:bg-transparent">
                     <TableHead>name</TableHead>
                     <TableHead className="hidden sm:table-cell">model</TableHead>
                     <TableHead>status</TableHead>
@@ -338,12 +338,12 @@ export default function Dashboard() {
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2">
                           {agent.isCeo && <AgentCeoBadge />}
-                          <span className="font-mono text-xs font-bold text-foreground">
+                          <span className="font-bold font-mono text-foreground text-xs">
                             {agent.name}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-code text-xs text-muted-foreground hidden sm:table-cell">
+                      <TableCell className="hidden font-code text-muted-foreground text-xs sm:table-cell">
                         {agent.model ?? <span className="opacity-40">—</span>}
                       </TableCell>
                       <TableCell>
@@ -351,7 +351,7 @@ export default function Dashboard() {
                           {getAgentStatusLabel(agent.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-code text-xs text-muted-foreground tabular-nums hidden md:table-cell">
+                      <TableCell className="hidden font-code text-muted-foreground text-xs tabular-nums md:table-cell">
                         {formatDate(agent.createdAt)}
                       </TableCell>
                     </TableRow>
@@ -361,11 +361,11 @@ export default function Dashboard() {
             </div>
           )}
           {recentAgents.length > 0 && (
-            <div className="px-4 py-3 border-t border-border">
+            <div className="border-border border-t px-4 py-3">
               <button
                 type="button"
                 onClick={() => navigate('/agents')}
-                className="font-mono text-xs text-muted-foreground hover:text-primary transition-colors duration-200 tracking-widest active:opacity-70"
+                className="font-mono text-muted-foreground text-xs tracking-widest transition-colors duration-200 hover:text-primary active:opacity-70"
               >
                 {'> view all agents →'}
               </button>

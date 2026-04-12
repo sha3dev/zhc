@@ -23,6 +23,12 @@ export interface ConfigurationResponse {
     installationId: string | null;
     privateKey: SecretFieldState;
   };
+  human: {
+    email: string | null;
+  };
+  steel: {
+    apiKey: SecretFieldState;
+  };
 }
 
 export interface UpdateConfigurationInput {
@@ -45,5 +51,11 @@ export interface UpdateConfigurationInput {
     clientSecret?: string;
     installationId?: string | null;
     privateKey?: string | null;
+  };
+  human?: {
+    email?: string | null;
+  };
+  steel?: {
+    apiKey?: string;
   };
 }
