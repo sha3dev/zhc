@@ -14,7 +14,7 @@
   "dependencies": {
     "@hono/node-server": "1.19.12",
     "dotenv": "^16.4.7",
-    "hono": "4.12.10",
+    "hono": "4.12.12",
     "pg": "^8.13.3",
     "resend": "6.10.0",
     "zod": "^3.24.2"
